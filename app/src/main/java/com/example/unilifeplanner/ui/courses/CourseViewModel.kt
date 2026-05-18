@@ -48,6 +48,9 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     private val _addEditUiState = MutableStateFlow(AddEditCourseUiState())
     val addEditUiState: StateFlow<AddEditCourseUiState> = _addEditUiState.asStateFlow()
 
+    private val _courseDetailUiState = MutableStateFlow(CourseDetailUiState())
+    val courseDetailUiState: StateFlow<CourseDetailUiState> = _courseDetailUiState.asStateFlow()
+
     val uiState: StateFlow<CourseUiState> = combine(
         _courses,
         _isLoading,
@@ -78,12 +81,20 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     fun loadCourseById(courseId: Int) {
         selectedCourseJob?.cancel()
         selectedCourseJob = viewModelScope.launch {
+            _courseDetailUiState.value = CourseDetailUiState(isLoading = true)
             repository.getCourseById(courseId)
                 .catch { throwable ->
-                    _errorMessage.value = throwable.message ?: "Errore nel caricamento del corso"
+                    val message = throwable.message ?: "Errore nel caricamento del corso"
+                    _errorMessage.value = message
+                    _courseDetailUiState.value = CourseDetailUiState(errorMessage = message)
                 }
                 .collect { course ->
                     _selectedCourse.value = course
+                    _courseDetailUiState.value = if (course == null) {
+                        CourseDetailUiState(errorMessage = "Corso non trovato.")
+                    } else {
+                        CourseDetailUiState(course = course)
+                    }
                 }
         }
     }
@@ -332,8 +343,18 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun deleteCourse(course: CourseEntity) {
         viewModelScope.launch {
-            runDatabaseOperation {
+            try {
+                _courseDetailUiState.update { it.copy(isLoading = true, errorMessage = null) }
                 repository.deleteCourse(course)
+                _selectedCourse.value = null
+                _courseDetailUiState.value = CourseDetailUiState(deleteSuccess = true)
+            } catch (exception: Exception) {
+                _courseDetailUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Eliminazione non riuscita"
+                    )
+                }
             }
         }
     }
@@ -348,11 +369,15 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleFavorite(course: CourseEntity) {
         viewModelScope.launch {
-            runDatabaseOperation {
+            try {
                 repository.updateFavorite(
                     courseId = course.id,
                     isFavorite = !course.isFavorite
                 )
+            } catch (exception: Exception) {
+                val message = exception.message ?: "Aggiornamento preferito non riuscito"
+                _errorMessage.value = message
+                _courseDetailUiState.update { it.copy(errorMessage = message) }
             }
         }
     }
@@ -360,6 +385,11 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     fun clearError() {
         _errorMessage.value = null
         _addEditUiState.update { it.copy(errorMessage = null) }
+        _courseDetailUiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun resetDeleteState() {
+        _courseDetailUiState.update { it.copy(deleteSuccess = false) }
     }
 
     private fun observeCourses() {

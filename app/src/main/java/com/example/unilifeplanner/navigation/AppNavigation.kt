@@ -119,6 +119,14 @@ fun AppNavigation(
                 },
                 onBackClick = {
                     navController.popBackStack()
+                },
+                onCourseDeleted = {
+                    navController.navigate(Screen.Courses.route) {
+                        popUpTo(Screen.Courses.route) {
+                            inclusive = false
+                        }
+                        launchSingleTop = true
+                    }
                 }
             )
         }
