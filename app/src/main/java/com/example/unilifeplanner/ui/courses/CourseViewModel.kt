@@ -9,13 +9,13 @@ import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.domain.model.CourseStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -23,6 +23,8 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = CourseRepository(
         AppDatabase.getDatabase(application).courseDao()
     )
+
+    private val _allCourses = MutableStateFlow<List<CourseEntity>>(emptyList())
 
     private val _courses = MutableStateFlow<List<CourseEntity>>(emptyList())
     val courses: StateFlow<List<CourseEntity>> = _courses.asStateFlow()
@@ -33,11 +35,14 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedStatusFilter = MutableStateFlow<CourseStatus?>(null)
-    val selectedStatusFilter: StateFlow<CourseStatus?> = _selectedStatusFilter.asStateFlow()
+    private val _selectedStatusFilter = MutableStateFlow(CourseStatusFilter.ALL)
+    val selectedStatusFilter: StateFlow<CourseStatusFilter> = _selectedStatusFilter.asStateFlow()
 
     private val _showOnlyFavorites = MutableStateFlow(false)
     val showOnlyFavorites: StateFlow<Boolean> = _showOnlyFavorites.asStateFlow()
+
+    private val _selectedSortOption = MutableStateFlow(CourseSortOption.DEFAULT)
+    val selectedSortOption: StateFlow<CourseSortOption> = _selectedSortOption.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -51,13 +56,37 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     private val _courseDetailUiState = MutableStateFlow(CourseDetailUiState())
     val courseDetailUiState: StateFlow<CourseDetailUiState> = _courseDetailUiState.asStateFlow()
 
+    private val filterUiState = combine(
+        _allCourses,
+        _searchQuery,
+        _selectedStatusFilter,
+        _showOnlyFavorites,
+        _selectedSortOption
+    ) { allCourses, searchQuery, statusFilter, favoritesOnly, sortOption ->
+        val filteredCourses = applyFilters(
+            courses = allCourses,
+            query = searchQuery,
+            statusFilter = statusFilter,
+            favoritesOnly = favoritesOnly,
+            sortOption = sortOption
+        )
+
+        CourseUiState(
+            searchQuery = searchQuery,
+            selectedStatusFilter = statusFilter,
+            showFavoritesOnly = favoritesOnly,
+            selectedSortOption = sortOption,
+            courses = allCourses,
+            filteredCourses = filteredCourses
+        )
+    }
+
     val uiState: StateFlow<CourseUiState> = combine(
-        _courses,
+        filterUiState,
         _isLoading,
         _errorMessage
-    ) { courses, isLoading, errorMessage ->
-        CourseUiState(
-            courses = courses,
+    ) { state, isLoading, errorMessage ->
+        state.copy(
             isLoading = isLoading,
             errorMessage = errorMessage
         )
@@ -159,7 +188,12 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateProfessor(value: String) {
         _addEditUiState.update {
-            it.copy(professor = value, professorError = null, errorMessage = null, saveSuccess = false)
+            it.copy(
+                professor = value,
+                professorError = null,
+                errorMessage = null,
+                saveSuccess = false
+            )
         }
     }
 
@@ -262,17 +296,30 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
-        observeCourses()
+        updateVisibleCourses()
     }
 
-    fun onStatusFilterChange(status: CourseStatus?) {
-        _selectedStatusFilter.value = status
-        observeCourses()
+    fun onStatusFilterChange(filter: CourseStatusFilter) {
+        _selectedStatusFilter.value = filter
+        updateVisibleCourses()
     }
 
-    fun onFavoriteFilterChange(showOnlyFavorites: Boolean) {
-        _showOnlyFavorites.value = showOnlyFavorites
-        observeCourses()
+    fun onFavoritesOnlyChange(enabled: Boolean) {
+        _showOnlyFavorites.value = enabled
+        updateVisibleCourses()
+    }
+
+    fun onSortOptionChange(option: CourseSortOption) {
+        _selectedSortOption.value = option
+        updateVisibleCourses()
+    }
+
+    fun clearFilters() {
+        _searchQuery.value = ""
+        _selectedStatusFilter.value = CourseStatusFilter.ALL
+        _showOnlyFavorites.value = false
+        _selectedSortOption.value = CourseSortOption.DEFAULT
+        updateVisibleCourses()
     }
 
     fun insertCourse(
@@ -396,47 +443,64 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         coursesJob?.cancel()
         coursesJob = viewModelScope.launch {
             _isLoading.value = true
-            activeCoursesFlow()
+            repository.allCourses
                 .catch { throwable ->
                     _isLoading.value = false
                     _errorMessage.value = throwable.message ?: "Errore nel caricamento dei corsi"
                 }
                 .collect { courseList ->
-                    _courses.value = applyInMemoryFilters(courseList)
+                    _allCourses.value = courseList
+                    updateVisibleCourses()
                     _isLoading.value = false
                 }
         }
     }
 
-    private fun activeCoursesFlow() = when {
-        _searchQuery.value.isNotBlank() -> repository.searchCourses(_searchQuery.value)
-        _selectedStatusFilter.value != null -> {
-            repository.getCoursesByStatus(requireNotNull(_selectedStatusFilter.value))
-        }
-
-        _showOnlyFavorites.value -> repository.getFavoriteCourses()
-        else -> repository.allCourses
+    private fun updateVisibleCourses() {
+        _courses.value = applyFilters(
+            courses = _allCourses.value,
+            query = _searchQuery.value,
+            statusFilter = _selectedStatusFilter.value,
+            favoritesOnly = _showOnlyFavorites.value,
+            sortOption = _selectedSortOption.value
+        )
     }
 
-    private fun applyInMemoryFilters(courses: List<CourseEntity>): List<CourseEntity> {
-        val status = _selectedStatusFilter.value
-        val query = _searchQuery.value.trim()
-        val favoritesOnly = _showOnlyFavorites.value
+    private fun applyFilters(
+        courses: List<CourseEntity>,
+        query: String,
+        statusFilter: CourseStatusFilter,
+        favoritesOnly: Boolean,
+        sortOption: CourseSortOption
+    ): List<CourseEntity> {
+        val normalizedQuery = query.trim()
 
-        return courses
+        val filteredCourses = courses
             .asSequence()
             .filter { course ->
-                query.isBlank() ||
-                    course.name.contains(query, ignoreCase = true) ||
-                    course.professor.contains(query, ignoreCase = true)
+                normalizedQuery.isBlank() ||
+                    course.name.contains(normalizedQuery, ignoreCase = true) ||
+                    course.professor.contains(normalizedQuery, ignoreCase = true) ||
+                    course.classroom.orEmpty().contains(normalizedQuery, ignoreCase = true)
             }
             .filter { course ->
-                status == null || course.status == status.name
+                statusFilter == CourseStatusFilter.ALL || course.status == statusFilter.name
             }
             .filter { course ->
                 !favoritesOnly || course.isFavorite
             }
             .toList()
+
+        return when (sortOption) {
+            CourseSortOption.DEFAULT -> filteredCourses
+            CourseSortOption.EXAM_DATE_ASC -> filteredCourses.sortedWith(
+                compareBy<CourseEntity> { it.examDate == null }
+                    .thenBy { it.examDate ?: Long.MAX_VALUE }
+                    .thenBy { it.name.lowercase() }
+            )
+
+            CourseSortOption.NAME_ASC -> filteredCourses.sortedBy { it.name.lowercase() }
+        }
     }
 
     private suspend fun runDatabaseOperation(operation: suspend () -> Unit) {
