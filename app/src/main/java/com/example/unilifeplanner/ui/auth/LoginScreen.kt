@@ -4,15 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -25,11 +25,17 @@ import com.example.unilifeplanner.ui.components.UniLifeTextField
 
 @Composable
 fun LoginScreen(
-    onLoginClick: () -> Unit,
-    onRegisterClick: () -> Unit
+    authViewModel: AuthViewModel,
+    onLoginSuccess: () -> Unit,
+    onNavigateToRegister: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    val uiState by authViewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.isAuthenticated) {
+        if (uiState.isAuthenticated) {
+            onLoginSuccess()
+        }
+    }
 
     Scaffold { innerPadding ->
         UniLifeScreenContainer(
@@ -45,30 +51,50 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Organizza corsi, esami e scadenze universitarie in un unico spazio.",
+                text = "Accedi al tuo account",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(32.dp))
             UniLifeTextField(
-                value = email,
-                onValueChange = { email = it },
+                value = uiState.email,
+                onValueChange = authViewModel::onEmailChange,
                 label = "Email",
                 keyboardType = KeyboardType.Email
             )
             Spacer(modifier = Modifier.height(12.dp))
             UniLifePasswordTextField(
-                value = password,
-                onValueChange = { password = it },
+                value = uiState.password,
+                onValueChange = authViewModel::onPasswordChange,
                 label = "Password"
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            uiState.errorMessage?.let { errorMessage ->
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            if (uiState.isLoading) {
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+            }
             UniLifePrimaryButton(
-                text = "Login",
-                onClick = onLoginClick
+                text = "Accedi",
+                onClick = authViewModel::login,
+                enabled = !uiState.isLoading
             )
-            TextButton(onClick = onRegisterClick) {
+            TextButton(
+                onClick = {
+                    authViewModel.clearError()
+                    onNavigateToRegister()
+                },
+                enabled = !uiState.isLoading
+            ) {
                 Text(text = "Non hai un account? Registrati")
             }
         }

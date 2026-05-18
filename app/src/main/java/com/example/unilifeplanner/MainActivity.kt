@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.navigation.compose.rememberNavController
 import com.example.unilifeplanner.navigation.AppNavigation
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 
@@ -13,7 +14,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             UniLifePlannerTheme {
-                AppNavigation()
+                val navController = rememberNavController()
+                AppNavigation(navController = navController)
             }
         }
     }

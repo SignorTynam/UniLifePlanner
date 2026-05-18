@@ -23,12 +23,12 @@ import com.example.unilifeplanner.ui.components.UniLifeTopBar
 
 @Composable
 fun HomeScreen(
-    onCoursesClick: () -> Unit,
-    onProfileClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    onMapClick: () -> Unit,
-    onStatisticsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onNavigateToCourses: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToMap: () -> Unit,
+    onNavigateToStatistics: () -> Unit,
+    onLogout: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -47,7 +47,7 @@ fun HomeScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "Bentornato",
+                        text = "Benvenuto in UniLife Planner",
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -86,17 +86,17 @@ fun HomeScreen(
                 style = MaterialTheme.typography.titleLarge
             )
             Spacer(modifier = Modifier.height(12.dp))
-            UniLifePrimaryButton(text = "Corsi", onClick = onCoursesClick)
+            UniLifePrimaryButton(text = "Vai ai corsi", onClick = onNavigateToCourses)
             Spacer(modifier = Modifier.height(10.dp))
-            UniLifeOutlinedButton(text = "Profilo", onClick = onProfileClick)
+            UniLifeOutlinedButton(text = "Profilo", onClick = onNavigateToProfile)
             Spacer(modifier = Modifier.height(10.dp))
-            UniLifeOutlinedButton(text = "Impostazioni", onClick = onSettingsClick)
+            UniLifeOutlinedButton(text = "Impostazioni", onClick = onNavigateToSettings)
             Spacer(modifier = Modifier.height(10.dp))
-            UniLifeOutlinedButton(text = "Mappa", onClick = onMapClick)
+            UniLifeOutlinedButton(text = "Mappa", onClick = onNavigateToMap)
             Spacer(modifier = Modifier.height(10.dp))
-            UniLifeOutlinedButton(text = "Statistiche", onClick = onStatisticsClick)
+            UniLifeOutlinedButton(text = "Statistiche", onClick = onNavigateToStatistics)
             Spacer(modifier = Modifier.height(20.dp))
-            UniLifeOutlinedButton(text = "Logout", onClick = onLogoutClick)
+            UniLifeOutlinedButton(text = "Logout", onClick = onLogout)
         }
     }
 }

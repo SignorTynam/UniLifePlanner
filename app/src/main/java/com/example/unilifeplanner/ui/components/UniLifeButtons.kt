@@ -13,10 +13,12 @@ import androidx.compose.ui.unit.dp
 fun UniLifePrimaryButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 420.dp)
@@ -29,10 +31,12 @@ fun UniLifePrimaryButton(
 fun UniLifeOutlinedButton(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 420.dp)

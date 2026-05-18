@@ -1,11 +1,13 @@
 package com.example.unilifeplanner.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.unilifeplanner.ui.auth.AuthViewModel
 import com.example.unilifeplanner.ui.auth.LoginScreen
 import com.example.unilifeplanner.ui.auth.RegisterScreen
 import com.example.unilifeplanner.ui.courses.AddEditCourseScreen
@@ -18,16 +20,24 @@ import com.example.unilifeplanner.ui.settings.SettingsScreen
 import com.example.unilifeplanner.ui.statistics.StatisticsScreen
 
 @Composable
-fun AppNavigation() {
-    val navController = rememberNavController()
+fun AppNavigation(
+    navController: NavHostController,
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val startDestination = if (authViewModel.uiState.value.isAuthenticated) {
+        Screen.Home.route
+    } else {
+        Screen.Login.route
+    }
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = startDestination
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
-                onLoginClick = {
+                authViewModel = authViewModel,
+                onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) {
                             inclusive = true
@@ -35,7 +45,7 @@ fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
-                onRegisterClick = {
+                onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
                 }
             )
@@ -43,7 +53,8 @@ fun AppNavigation() {
 
         composable(Screen.Register.route) {
             RegisterScreen(
-                onCreateAccountClick = {
+                authViewModel = authViewModel,
+                onRegisterSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) {
                             inclusive = true
@@ -51,7 +62,7 @@ fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
-                onLoginClick = {
+                onNavigateToLogin = {
                     navController.popBackStack(Screen.Login.route, inclusive = false)
                 }
             )
@@ -59,16 +70,15 @@ fun AppNavigation() {
 
         composable(Screen.Home.route) {
             HomeScreen(
-                onCoursesClick = { navController.navigate(Screen.Courses.route) },
-                onProfileClick = { navController.navigate(Screen.Profile.route) },
-                onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                onMapClick = { navController.navigate(Screen.Map.route) },
-                onStatisticsClick = { navController.navigate(Screen.Statistics.route) },
-                onLogoutClick = {
+                onNavigateToCourses = { navController.navigate(Screen.Courses.route) },
+                onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToMap = { navController.navigate(Screen.Map.route) },
+                onNavigateToStatistics = { navController.navigate(Screen.Statistics.route) },
+                onLogout = {
+                    authViewModel.logout()
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(navController.graph.id) {
-                            inclusive = true
-                        }
+                        popUpTo(0)
                         launchSingleTop = true
                     }
                 }
