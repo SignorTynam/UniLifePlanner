@@ -126,10 +126,7 @@ fun AppNavigation(
         composable(Screen.AddEditCourse.route) {
             AddEditCourseScreen(
                 courseId = null,
-                onSaveClick = {
-                    navController.popBackStack()
-                },
-                onBackClick = {
+                onNavigateBack = {
                     navController.popBackStack()
                 }
             )
@@ -148,10 +145,7 @@ fun AppNavigation(
 
             AddEditCourseScreen(
                 courseId = courseId,
-                onSaveClick = {
-                    navController.popBackStack()
-                },
-                onBackClick = {
+                onNavigateBack = {
                     navController.popBackStack()
                 }
             )

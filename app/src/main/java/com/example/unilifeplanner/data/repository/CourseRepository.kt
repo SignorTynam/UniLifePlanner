@@ -22,6 +22,21 @@ class CourseRepository(
     fun getFavoriteCourses(): Flow<List<CourseEntity>> =
         courseDao.getFavoriteCourses()
 
+    suspend fun insertCourse(course: CourseEntity): Long {
+        val now = System.currentTimeMillis()
+        return courseDao.insertCourse(
+            course.copy(
+                id = 0,
+                name = course.name.trim(),
+                professor = course.professor.trim(),
+                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
+                notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+    }
+
     suspend fun insertCourse(
         name: String,
         professor: String,
@@ -70,6 +85,18 @@ class CourseRepository(
                 status = status.name,
                 isFavorite = isFavorite,
                 notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun updateCourse(course: CourseEntity) {
+        courseDao.updateCourse(
+            course.copy(
+                name = course.name.trim(),
+                professor = course.professor.trim(),
+                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
+                notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
                 updatedAt = System.currentTimeMillis()
             )
         )

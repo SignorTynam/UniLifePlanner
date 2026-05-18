@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -43,6 +44,9 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _addEditUiState = MutableStateFlow(AddEditCourseUiState())
+    val addEditUiState: StateFlow<AddEditCourseUiState> = _addEditUiState.asStateFlow()
 
     val uiState: StateFlow<CourseUiState> = combine(
         _courses,
@@ -82,6 +86,167 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     _selectedCourse.value = course
                 }
         }
+    }
+
+    fun loadCourse(courseId: Int) {
+        viewModelScope.launch {
+            _addEditUiState.update {
+                it.copy(
+                    courseId = courseId,
+                    isLoading = true,
+                    errorMessage = null,
+                    saveSuccess = false
+                )
+            }
+
+            try {
+                val course = repository.getCourseById(courseId).first()
+                if (course == null) {
+                    _addEditUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Corso non trovato"
+                        )
+                    }
+                    return@launch
+                }
+
+                _selectedCourse.value = course
+                _addEditUiState.value = AddEditCourseUiState(
+                    courseId = course.id,
+                    name = course.name,
+                    professor = course.professor,
+                    examDate = course.examDate,
+                    classroom = course.classroom.orEmpty(),
+                    credits = course.credits.toString(),
+                    status = CourseStatus.entries.firstOrNull { it.name == course.status }
+                        ?: CourseStatus.TO_STUDY,
+                    notes = course.notes.orEmpty(),
+                    isLoading = false
+                )
+            } catch (exception: Exception) {
+                _addEditUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Errore nel caricamento del corso"
+                    )
+                }
+            }
+        }
+    }
+
+    fun resetAddEditCourseState() {
+        _selectedCourse.value = null
+        _addEditUiState.value = AddEditCourseUiState()
+    }
+
+    fun updateName(value: String) {
+        _addEditUiState.update {
+            it.copy(name = value, nameError = null, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun updateProfessor(value: String) {
+        _addEditUiState.update {
+            it.copy(professor = value, professorError = null, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun updateExamDate(value: Long?) {
+        _addEditUiState.update {
+            it.copy(examDate = value, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun updateClassroom(value: String) {
+        _addEditUiState.update {
+            it.copy(classroom = value, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun updateCredits(value: String) {
+        _addEditUiState.update {
+            it.copy(credits = value, creditsError = null, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun updateStatus(value: CourseStatus) {
+        _addEditUiState.update {
+            it.copy(status = value, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun updateNotes(value: String) {
+        _addEditUiState.update {
+            it.copy(notes = value, errorMessage = null, saveSuccess = false)
+        }
+    }
+
+    fun saveCourse() {
+        val state = _addEditUiState.value
+        val creditsValue = state.credits.toIntOrNull()
+        val validatedState = validateAddEditState(state, creditsValue)
+        if (validatedState != null) {
+            _addEditUiState.value = validatedState
+            return
+        }
+
+        viewModelScope.launch {
+            _addEditUiState.update {
+                it.copy(isSaving = true, errorMessage = null, saveSuccess = false)
+            }
+
+            try {
+                val existingCourse = _selectedCourse.value
+                if (state.courseId == null) {
+                    repository.insertCourse(
+                        name = state.name,
+                        professor = state.professor,
+                        examDate = state.examDate,
+                        classroom = state.classroom,
+                        credits = requireNotNull(creditsValue),
+                        status = state.status,
+                        notes = state.notes
+                    )
+                } else {
+                    if (existingCourse == null) {
+                        _addEditUiState.update {
+                            it.copy(
+                                isSaving = false,
+                                errorMessage = "Corso non trovato"
+                            )
+                        }
+                        return@launch
+                    }
+
+                    repository.updateCourse(
+                        course = existingCourse,
+                        name = state.name,
+                        professor = state.professor,
+                        examDate = state.examDate,
+                        classroom = state.classroom,
+                        credits = requireNotNull(creditsValue),
+                        status = state.status,
+                        notes = state.notes
+                    )
+                }
+
+                _addEditUiState.update {
+                    it.copy(isSaving = false, saveSuccess = true)
+                }
+            } catch (exception: Exception) {
+                _addEditUiState.update {
+                    it.copy(
+                        isSaving = false,
+                        errorMessage = exception.message ?: "Salvataggio non riuscito"
+                    )
+                }
+            }
+        }
+    }
+
+    fun resetSaveState() {
+        _addEditUiState.update { it.copy(saveSuccess = false) }
     }
 
     fun onSearchQueryChange(query: String) {
@@ -194,6 +359,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearError() {
         _errorMessage.value = null
+        _addEditUiState.update { it.copy(errorMessage = null) }
     }
 
     private fun observeCourses() {
@@ -265,6 +431,39 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
             professor.isBlank() -> "Il docente e obbligatorio"
             credits <= 0 -> "I CFU devono essere maggiori di 0"
             else -> null
+        }
+    }
+
+    private fun validateAddEditState(
+        state: AddEditCourseUiState,
+        creditsValue: Int?
+    ): AddEditCourseUiState? {
+        val nameError = if (state.name.isBlank()) {
+            "Il nome del corso e obbligatorio"
+        } else {
+            null
+        }
+        val professorError = if (state.professor.isBlank()) {
+            "Il docente e obbligatorio"
+        } else {
+            null
+        }
+        val creditsError = when {
+            state.credits.isBlank() -> "I CFU sono obbligatori"
+            creditsValue == null || creditsValue <= 0 -> "I CFU devono essere maggiori di 0"
+            else -> null
+        }
+
+        return if (nameError == null && professorError == null && creditsError == null) {
+            null
+        } else {
+            state.copy(
+                nameError = nameError,
+                professorError = professorError,
+                creditsError = creditsError,
+                errorMessage = "Controlla i campi evidenziati",
+                saveSuccess = false
+            )
         }
     }
 }
