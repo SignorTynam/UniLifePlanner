@@ -91,8 +91,8 @@ fun AppNavigation(
                 onAddCourseClick = {
                     navController.navigate(Screen.AddEditCourse.createRoute())
                 },
-                onDemoCourseClick = {
-                    navController.navigate(Screen.CourseDetail.createRoute(courseId = 1))
+                onCourseClick = { courseId ->
+                    navController.navigate(Screen.CourseDetail.createRoute(courseId))
                 },
                 onBackClick = {
                     navController.popBackStack()

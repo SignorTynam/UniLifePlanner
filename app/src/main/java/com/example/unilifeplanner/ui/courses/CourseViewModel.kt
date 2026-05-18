@@ -11,7 +11,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -40,6 +43,22 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    val uiState: StateFlow<CourseUiState> = combine(
+        _courses,
+        _isLoading,
+        _errorMessage
+    ) { courses, isLoading, errorMessage ->
+        CourseUiState(
+            courses = courses,
+            isLoading = isLoading,
+            errorMessage = errorMessage
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = CourseUiState(isLoading = true)
+    )
 
     private var coursesJob: Job? = null
     private var selectedCourseJob: Job? = null
