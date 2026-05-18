@@ -70,11 +70,12 @@ fun AppNavigation(
 
         composable(Screen.Home.route) {
             HomeScreen(
-                onNavigateToCourses = { navController.navigate(Screen.Courses.route) },
-                onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToMap = { navController.navigate(Screen.Map.route) },
-                onNavigateToStatistics = { navController.navigate(Screen.Statistics.route) },
+                onOpenCourses = { navController.navigate(Screen.Courses.route) },
+                onAddCourse = { navController.navigate(Screen.AddEditCourse.createRoute()) },
+                onOpenStatistics = { navController.navigate(Screen.Statistics.route) },
+                onOpenMap = { navController.navigate(Screen.Map.route) },
+                onOpenProfile = { navController.navigate(Screen.Profile.route) },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onLogout = {
                     authViewModel.logout()
                     navController.navigate(Screen.Login.route) {
