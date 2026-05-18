@@ -56,11 +56,17 @@ interface CourseDao {
     )
     fun getFavoriteCourses(): Flow<List<CourseEntity>>
 
-    @Query("UPDATE courses SET isFavorite = :isFavorite, updatedAt = :updatedAt WHERE id = :courseId")
+    @Query(
+        """
+        UPDATE courses
+        SET isFavorite = :isFavorite,
+            updatedAt = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+        WHERE id = :courseId
+        """
+    )
     suspend fun updateFavorite(
         courseId: Int,
-        isFavorite: Boolean,
-        updatedAt: Long
+        isFavorite: Boolean
     )
 
     @Query("SELECT COUNT(*) FROM courses WHERE status = 'COMPLETED'")

@@ -89,8 +89,7 @@ class CourseRepository(
     ) {
         courseDao.updateFavorite(
             courseId = courseId,
-            isFavorite = isFavorite,
-            updatedAt = System.currentTimeMillis()
+            isFavorite = isFavorite
         )
     }
 
