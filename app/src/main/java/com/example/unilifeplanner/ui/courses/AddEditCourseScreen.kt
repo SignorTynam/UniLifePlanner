@@ -1,33 +1,32 @@
 package com.example.unilifeplanner.ui.courses
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.unilifeplanner.ui.components.UniLifeOutlinedButton
+import com.example.unilifeplanner.ui.components.UniLifePrimaryButton
+import com.example.unilifeplanner.ui.components.UniLifeScreenContainer
+import com.example.unilifeplanner.ui.components.UniLifeTextField
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditCourseScreen(
     courseId: Int?,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
+    var courseName by remember { mutableStateOf("") }
     val title = if (courseId == null) {
         "Aggiungi nuovo corso"
     } else {
@@ -36,48 +35,42 @@ fun AddEditCourseScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(text = "Corso")
-                },
-                navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text(text = "Back")
-                    }
-                }
+            UniLifeTopBar(
+                title = "Corso",
+                onBackClick = onBackClick
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        UniLifeScreenContainer(
+            modifier = Modifier.padding(innerPadding),
+            contentPadding = PaddingValues(20.dp)
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineMedium
             )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onSaveClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-            ) {
-                Text(text = "Salva")
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-            ) {
-                Text(text = "Back")
-            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Placeholder grafico: il salvataggio reale verra collegato nelle fasi dati.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            UniLifeTextField(
+                value = courseName,
+                onValueChange = { courseName = it },
+                label = "Nome corso"
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            UniLifePrimaryButton(
+                text = "Salva",
+                onClick = onSaveClick
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            UniLifeOutlinedButton(
+                text = "Back",
+                onClick = onBackClick
+            )
         }
     }
 }

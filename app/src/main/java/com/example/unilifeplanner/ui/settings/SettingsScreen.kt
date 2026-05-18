@@ -1,63 +1,95 @@
 package com.example.unilifeplanner.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.unilifeplanner.ui.components.UniLifeScreenContainer
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(text = "Impostazioni")
-                },
-                navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text(text = "Back")
-                    }
-                }
+            UniLifeTopBar(
+                title = "Impostazioni",
+                onBackClick = onBackClick
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        UniLifeScreenContainer(
+            modifier = Modifier.padding(innerPadding),
+            contentPadding = PaddingValues(20.dp)
         ) {
             Text(
-                text = "Impostazioni",
-                style = MaterialTheme.typography.headlineSmall
+                text = "Aspetto",
+                style = MaterialTheme.typography.headlineMedium
             )
-            Button(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .padding(top = 24.dp)
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-            ) {
-                Text(text = "Back")
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Tema app",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Placeholder per la selezione del tema nelle fasi successive.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ThemeChip(text = "Automatico", selected = true)
+                    ThemeChip(text = "Chiaro", selected = false)
+                    ThemeChip(text = "Scuro", selected = false)
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "Preferenze",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    headlineContent = { Text(text = "Notifiche") },
+                    supportingContent = { Text(text = "Placeholder non attivo") }
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text(text = "Preferiti") },
+                    supportingContent = { Text(text = "Gestione disponibile in una fase successiva") }
+                )
             }
         }
     }
+}
+
+@Composable
+private fun ThemeChip(
+    text: String,
+    selected: Boolean
+) {
+    FilterChip(
+        selected = selected,
+        onClick = {},
+        label = {
+            Text(text = text)
+        },
+        modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
+    )
 }

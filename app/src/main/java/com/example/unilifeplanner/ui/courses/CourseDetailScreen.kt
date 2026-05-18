@@ -1,27 +1,23 @@
 package com.example.unilifeplanner.ui.courses
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.unilifeplanner.ui.components.UniLifeOutlinedButton
+import com.example.unilifeplanner.ui.components.UniLifePrimaryButton
+import com.example.unilifeplanner.ui.components.UniLifeScreenContainer
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CourseDetailScreen(
     courseId: Int,
@@ -30,48 +26,45 @@ fun CourseDetailScreen(
 ) {
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(text = "Dettaglio corso")
-                },
-                navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text(text = "Back")
-                    }
-                }
+            UniLifeTopBar(
+                title = "Dettaglio corso",
+                onBackClick = onBackClick
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        UniLifeScreenContainer(
+            modifier = Modifier.padding(innerPadding),
+            contentPadding = PaddingValues(20.dp)
         ) {
             Text(
                 text = "Dettaglio corso ID: $courseId",
-                style = MaterialTheme.typography.headlineSmall
+                style = MaterialTheme.typography.headlineMedium
             )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onEditCourseClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-            ) {
-                Text(text = "Modifica corso")
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Informazioni corso",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Questa schermata e un placeholder per lezioni, esami e scadenze del corso.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-            ) {
-                Text(text = "Back")
-            }
+            Spacer(modifier = Modifier.height(20.dp))
+            UniLifePrimaryButton(
+                text = "Modifica corso",
+                onClick = onEditCourseClick
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            UniLifeOutlinedButton(
+                text = "Back",
+                onClick = onBackClick
+            )
         }
     }
 }
