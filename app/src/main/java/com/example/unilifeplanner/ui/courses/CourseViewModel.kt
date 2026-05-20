@@ -415,11 +415,21 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleFavorite(course: CourseEntity) {
+        toggleFavorite(
+            courseId = course.id,
+            currentFavorite = course.isFavorite
+        )
+    }
+
+    fun toggleFavorite(
+        courseId: Int,
+        currentFavorite: Boolean
+    ) {
         viewModelScope.launch {
             try {
                 repository.updateFavorite(
-                    courseId = course.id,
-                    isFavorite = !course.isFavorite
+                    courseId = courseId,
+                    isFavorite = !currentFavorite
                 )
             } catch (exception: Exception) {
                 val message = exception.message ?: "Aggiornamento preferito non riuscito"

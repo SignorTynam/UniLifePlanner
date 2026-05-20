@@ -9,6 +9,7 @@ class CourseRepository(
     private val courseDao: CourseDao
 ) {
     val allCourses: Flow<List<CourseEntity>> = courseDao.getAllCourses()
+    val favoriteCoursesFlow: Flow<List<CourseEntity>> = courseDao.getFavoriteCourses()
 
     fun getCourseById(courseId: Int): Flow<CourseEntity?> =
         courseDao.getCourseById(courseId)
@@ -20,7 +21,7 @@ class CourseRepository(
         courseDao.getCoursesByStatus(status.name)
 
     fun getFavoriteCourses(): Flow<List<CourseEntity>> =
-        courseDao.getFavoriteCourses()
+        favoriteCoursesFlow
 
     suspend fun insertCourse(course: CourseEntity): Long {
         val now = System.currentTimeMillis()
