@@ -1,9 +1,6 @@
 package com.example.unilifeplanner.ui.courses
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.provider.CalendarContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -59,6 +59,8 @@ import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.notifications.NotificationHelper
 import com.example.unilifeplanner.ui.courses.components.formatCourseStatus
 import com.example.unilifeplanner.ui.courses.components.formatExamDate
+import com.example.unilifeplanner.ui.utils.ExternalIntentResult
+import com.example.unilifeplanner.ui.utils.ExternalIntentUtils
 import kotlinx.coroutines.launch
 
 @Composable
@@ -191,13 +193,9 @@ private fun CourseDetailContent(
                     onEditCourseClick = onEditCourseClick,
                     onDeleteClick = { showDeleteDialog = true },
                     onToggleReminder = onToggleReminder,
-                    onAddToCalendarClick = {
-                        if (course.examDate == null) {
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar("Data esame non disponibile")
-                            }
-                        } else {
-                            openCalendarIntent(context, course)
+                    onExternalActionMessage = { message ->
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar(message)
                         }
                     }
                 )
@@ -235,7 +233,7 @@ private fun CourseDetailBody(
     onEditCourseClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onToggleReminder: (CourseEntity) -> Unit,
-    onAddToCalendarClick: () -> Unit
+    onExternalActionMessage: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -248,12 +246,17 @@ private fun CourseDetailBody(
         item {
             ExamInfoCard(
                 course = course,
-                onToggleReminder = { onToggleReminder(course) },
-                onAddToCalendarClick = onAddToCalendarClick
+                onToggleReminder = { onToggleReminder(course) }
             )
         }
         item {
             NotesCard(notes = course.notes)
+        }
+        item {
+            ExternalActionsCard(
+                course = course,
+                onExternalActionMessage = onExternalActionMessage
+            )
         }
         item {
             ActionsCard(
@@ -303,8 +306,7 @@ private fun CourseInfoCard(course: CourseEntity) {
 @Composable
 private fun ExamInfoCard(
     course: CourseEntity,
-    onToggleReminder: () -> Unit,
-    onAddToCalendarClick: () -> Unit
+    onToggleReminder: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -324,18 +326,6 @@ private fun ExamInfoCard(
                 course = course,
                 onToggleReminder = onToggleReminder
             )
-            Button(
-                onClick = onAddToCalendarClick,
-                enabled = course.examDate != null,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarMonth,
-                    contentDescription = null
-                )
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Text(text = "Aggiungi al calendario")
-            }
         }
     }
 }
@@ -392,6 +382,82 @@ private fun NotesCard(notes: String?) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+private fun ExternalActionsCard(
+    course: CourseEntity,
+    onExternalActionMessage: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Azioni esterne",
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Button(
+                onClick = {
+                    ExternalIntentUtils.addCourseToCalendar(context, course)
+                        .messageOrNull()
+                        ?.let(onExternalActionMessage)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(imageVector = Icons.Filled.CalendarMonth, contentDescription = null)
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Text(text = "Aggiungi al calendario")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    ExternalIntentUtils.openCourseLocationInMaps(context, course.classroom)
+                        .messageOrNull()
+                        ?.let(onExternalActionMessage)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(imageVector = Icons.Filled.Map, contentDescription = null)
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Text(text = "Apri su Maps")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    ExternalIntentUtils.shareCourse(context, course)
+                        .messageOrNull()
+                        ?.let(onExternalActionMessage)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(imageVector = Icons.Filled.Share, contentDescription = null)
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Text(text = "Condividi")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    ExternalIntentUtils.sendEmailToProfessor(
+                        context = context,
+                        email = null,
+                        courseName = course.name
+                    )
+                        .messageOrNull()
+                        ?.let(onExternalActionMessage)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(imageVector = Icons.Filled.Email, contentDescription = null)
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Text(text = "Email docente")
+            }
         }
     }
 }
@@ -472,32 +538,6 @@ private fun CourseDetailErrorState(message: String) {
     }
 }
 
-fun openCalendarIntent(
-    context: Context,
-    course: CourseEntity
-) {
-    val beginTime = course.examDate ?: return
-    val endTime = beginTime + 2 * 60 * 60 * 1000
-    val description = buildString {
-        append("Docente: ${course.professor}")
-        append("\nCFU: ${course.credits}")
-        course.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-            append("\nNote: $notes")
-        }
-    }
-
-    val intent = Intent(Intent.ACTION_INSERT).apply {
-        type = "vnd.android.cursor.item/event"
-        putExtra(CalendarContract.Events.TITLE, "Esame: ${course.name}")
-        putExtra(CalendarContract.Events.DESCRIPTION, description)
-        putExtra(CalendarContract.Events.EVENT_LOCATION, course.classroom.orEmpty())
-        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginTime)
-        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endTime)
-    }
-
-    context.startActivity(intent)
-}
-
 private fun isValidFutureExamDate(examDate: Long?): Boolean {
     return examDate != null && examDate > System.currentTimeMillis()
 }
@@ -507,5 +547,14 @@ private fun reminderUnavailableMessage(examDate: Long?): String {
         "Aggiungi una data esame per attivare il promemoria"
     } else {
         "La data dell'esame e passata"
+    }
+}
+
+private fun ExternalIntentResult.messageOrNull(): String? {
+    return when (this) {
+        ExternalIntentResult.Success -> null
+        is ExternalIntentResult.MissingData -> message
+        is ExternalIntentResult.NoCompatibleApp -> message
+        is ExternalIntentResult.Error -> message
     }
 }
