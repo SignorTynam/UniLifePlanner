@@ -3,16 +3,15 @@ package com.example.unilifeplanner.ui.courses.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Room
-import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Card
@@ -29,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.domain.model.CourseStatus
+import com.example.unilifeplanner.ui.components.InfoPill
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -36,6 +36,7 @@ import java.time.format.DateTimeFormatter
 
 private val ExamDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CourseCard(
     course: CourseEntity,
@@ -49,9 +50,10 @@ fun CourseCard(
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
@@ -60,7 +62,8 @@ fun CourseCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = course.name,
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     CourseInfoRow(
@@ -90,28 +93,17 @@ fun CourseCard(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            CourseInfoRow(
-                icon = Icons.Filled.CalendarMonth,
-                text = "Esame: ${formatExamDate(course.examDate)}"
-            )
-            course.classroom?.takeIf { it.isNotBlank() }?.let { classroom ->
-                Spacer(modifier = Modifier.height(6.dp))
-                CourseInfoRow(
-                    icon = Icons.Filled.Room,
-                    text = "Aula: $classroom"
-                )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatusPill(status = course.status)
+                InfoPill(text = "${course.credits} CFU")
+                InfoPill(text = formatExamDate(course.examDate))
+                course.classroom?.takeIf { it.isNotBlank() }?.let { classroom ->
+                    InfoPill(text = classroom)
+                }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            CourseInfoRow(
-                icon = Icons.Filled.School,
-                text = "CFU: ${course.credits}"
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "Stato: ${formatCourseStatus(course.status)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }
@@ -136,6 +128,28 @@ private fun CourseInfoRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun StatusPill(status: String) {
+    val containerColor = when (status) {
+        CourseStatus.COMPLETED.name -> MaterialTheme.colorScheme.primaryContainer
+        CourseStatus.IN_PROGRESS.name -> MaterialTheme.colorScheme.secondaryContainer
+        CourseStatus.TO_STUDY.name -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = when (status) {
+        CourseStatus.COMPLETED.name -> MaterialTheme.colorScheme.onPrimaryContainer
+        CourseStatus.IN_PROGRESS.name -> MaterialTheme.colorScheme.onSecondaryContainer
+        CourseStatus.TO_STUDY.name -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    InfoPill(
+        text = formatCourseStatus(status),
+        containerColor = containerColor,
+        contentColor = contentColor
+    )
 }
 
 fun formatCourseStatus(status: String): String {

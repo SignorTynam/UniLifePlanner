@@ -15,13 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,7 +33,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.ui.components.UniLifeErrorState
+import com.example.unilifeplanner.ui.components.UniLifeLoadingState
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.courses.components.CourseCard
 
 @Composable
@@ -88,15 +89,9 @@ private fun CoursesScreenContent(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(text = "Corsi ed esami")
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Text(text = "Back")
-                    }
-                }
+            UniLifeTopBar(
+                title = "Corsi ed esami",
+                onBackClick = onBackClick
             )
         },
         floatingActionButton = {
@@ -242,7 +237,7 @@ private fun SortDropdown(
     Box {
         OutlinedButton(onClick = { expanded = true }) {
             Icon(
-                imageVector = Icons.Filled.Sort,
+                imageVector = Icons.AutoMirrored.Filled.Sort,
                 contentDescription = null
             )
             Spacer(modifier = Modifier.padding(horizontal = 4.dp))
@@ -322,25 +317,15 @@ fun EmptyCoursesState(
 fun CoursesErrorState(
     message: String
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "Si e verificato un errore durante il caricamento dei corsi.",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+        UniLifeErrorState(
+            title = "Errore caricamento",
+            message = message
         )
     }
 }
@@ -351,7 +336,7 @@ fun CoursesLoadingState() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        UniLifeLoadingState(message = "Caricamento corsi...")
     }
 }
 

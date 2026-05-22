@@ -39,7 +39,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.notifications.NotificationHelper
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.courses.components.formatCourseStatus
 import com.example.unilifeplanner.ui.courses.components.formatExamDate
 import com.example.unilifeplanner.ui.utils.ExternalIntentResult
@@ -148,13 +148,9 @@ private fun CourseDetailContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(text = "Dettaglio corso") },
-                navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text(text = "Back")
-                    }
-                },
+            UniLifeTopBar(
+                title = "Dettaglio corso",
+                onBackClick = onBackClick,
                 actions = {
                     if (course != null) {
                         IconButton(onClick = { onToggleFavorite(course) }) {

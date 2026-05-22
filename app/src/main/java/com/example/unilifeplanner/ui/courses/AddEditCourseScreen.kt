@@ -30,7 +30,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.notifications.NotificationHelper
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.courses.components.formatExamDate
 import kotlinx.coroutines.launch
 
@@ -146,13 +146,9 @@ private fun AddEditCourseContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(text = title) },
-                navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text(text = "Back")
-                    }
-                }
+            UniLifeTopBar(
+                title = title,
+                onBackClick = onBackClick
             )
         },
         snackbarHost = {

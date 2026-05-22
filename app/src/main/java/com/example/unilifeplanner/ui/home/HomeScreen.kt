@@ -117,6 +117,14 @@ private fun HomeScreenContent(
             item {
                 WelcomeSection(studentName = uiState.studentName)
             }
+            if (uiState.totalCourses == 0) {
+                item {
+                    EmptyStateCard(
+                        title = "Non hai ancora aggiunto corsi",
+                        message = "Premi + per creare il tuo primo corso e iniziare a vedere riepiloghi e statistiche."
+                    )
+                }
+            }
             item {
                 StudySummaryCard(uiState = uiState)
             }
