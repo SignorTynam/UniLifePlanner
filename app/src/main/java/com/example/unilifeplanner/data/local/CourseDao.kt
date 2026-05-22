@@ -69,6 +69,19 @@ interface CourseDao {
         isFavorite: Boolean
     )
 
+    @Query(
+        """
+        UPDATE courses
+        SET reminderEnabled = :enabled,
+            updatedAt = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+        WHERE id = :courseId
+        """
+    )
+    suspend fun updateReminderEnabled(
+        courseId: Int,
+        enabled: Boolean
+    )
+
     @Query("SELECT COUNT(*) FROM courses WHERE status = 'COMPLETED'")
     fun getCompletedCoursesCount(): Flow<Int>
 

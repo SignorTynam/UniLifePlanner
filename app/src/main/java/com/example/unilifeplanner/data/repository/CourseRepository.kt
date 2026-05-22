@@ -46,6 +46,7 @@ class CourseRepository(
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = false,
+        reminderEnabled: Boolean = false,
         notes: String?
     ): Long {
         val now = System.currentTimeMillis()
@@ -58,6 +59,7 @@ class CourseRepository(
                 credits = credits,
                 status = status.name,
                 isFavorite = isFavorite,
+                reminderEnabled = reminderEnabled,
                 notes = notes?.trim()?.takeIf { it.isNotEmpty() },
                 createdAt = now,
                 updatedAt = now
@@ -74,6 +76,7 @@ class CourseRepository(
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = course.isFavorite,
+        reminderEnabled: Boolean = course.reminderEnabled,
         notes: String?
     ) {
         courseDao.updateCourse(
@@ -85,6 +88,7 @@ class CourseRepository(
                 credits = credits,
                 status = status.name,
                 isFavorite = isFavorite,
+                reminderEnabled = reminderEnabled,
                 notes = notes?.trim()?.takeIf { it.isNotEmpty() },
                 updatedAt = System.currentTimeMillis()
             )
@@ -118,6 +122,16 @@ class CourseRepository(
         courseDao.updateFavorite(
             courseId = courseId,
             isFavorite = isFavorite
+        )
+    }
+
+    suspend fun updateReminderEnabled(
+        courseId: Int,
+        enabled: Boolean
+    ) {
+        courseDao.updateReminderEnabled(
+            courseId = courseId,
+            enabled = enabled
         )
     }
 

@@ -7,6 +7,7 @@ import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.domain.model.CourseStatus
+import com.example.unilifeplanner.notifications.ExamReminderScheduler
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,6 +24,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = CourseRepository(
         AppDatabase.getDatabase(application).courseDao()
     )
+    private val reminderScheduler = ExamReminderScheduler(application.applicationContext)
 
     private val _allCourses = MutableStateFlow<List<CourseEntity>>(emptyList())
 
@@ -161,6 +163,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     credits = course.credits.toString(),
                     status = CourseStatus.entries.firstOrNull { it.name == course.status }
                         ?: CourseStatus.TO_STUDY,
+                    reminderEnabled = course.reminderEnabled,
                     notes = course.notes.orEmpty(),
                     isLoading = false
                 )
@@ -199,7 +202,12 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateExamDate(value: Long?) {
         _addEditUiState.update {
-            it.copy(examDate = value, errorMessage = null, saveSuccess = false)
+            it.copy(
+                examDate = value,
+                reminderEnabled = it.reminderEnabled && isValidFutureExamDate(value),
+                errorMessage = null,
+                saveSuccess = false
+            )
         }
     }
 
@@ -227,6 +235,24 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun updateReminderEnabled(value: Boolean) {
+        _addEditUiState.update {
+            if (value && !isValidFutureExamDate(it.examDate)) {
+                it.copy(
+                    reminderEnabled = false,
+                    errorMessage = reminderUnavailableMessage(it.examDate),
+                    saveSuccess = false
+                )
+            } else {
+                it.copy(
+                    reminderEnabled = value,
+                    errorMessage = null,
+                    saveSuccess = false
+                )
+            }
+        }
+    }
+
     fun saveCourse() {
         val state = _addEditUiState.value
         val creditsValue = state.credits.toIntOrNull()
@@ -243,16 +269,26 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
             try {
                 val existingCourse = _selectedCourse.value
+                val shouldEnableReminder =
+                    state.reminderEnabled && isValidFutureExamDate(state.examDate)
                 if (state.courseId == null) {
-                    repository.insertCourse(
+                    val newCourseId = repository.insertCourse(
                         name = state.name,
                         professor = state.professor,
                         examDate = state.examDate,
                         classroom = state.classroom,
                         credits = requireNotNull(creditsValue),
                         status = state.status,
+                        reminderEnabled = shouldEnableReminder,
                         notes = state.notes
                     )
+                    if (shouldEnableReminder) {
+                        reminderScheduler.scheduleExamReminders(
+                            courseId = newCourseId.toInt(),
+                            courseName = state.name.trim(),
+                            examDate = requireNotNull(state.examDate)
+                        )
+                    }
                 } else {
                     if (existingCourse == null) {
                         _addEditUiState.update {
@@ -264,6 +300,11 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         return@launch
                     }
 
+                    val shouldCancelOldReminder =
+                        existingCourse.reminderEnabled ||
+                            existingCourse.examDate != state.examDate ||
+                            !shouldEnableReminder
+
                     repository.updateCourse(
                         course = existingCourse,
                         name = state.name,
@@ -272,8 +313,20 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         classroom = state.classroom,
                         credits = requireNotNull(creditsValue),
                         status = state.status,
+                        reminderEnabled = shouldEnableReminder,
                         notes = state.notes
                     )
+
+                    if (shouldCancelOldReminder) {
+                        reminderScheduler.cancelExamReminders(existingCourse.id)
+                    }
+                    if (shouldEnableReminder) {
+                        reminderScheduler.scheduleExamReminders(
+                            courseId = existingCourse.id,
+                            courseName = state.name.trim(),
+                            examDate = requireNotNull(state.examDate)
+                        )
+                    }
                 }
 
                 _addEditUiState.update {
@@ -330,6 +383,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = false,
+        reminderEnabled: Boolean = false,
         notes: String?
     ) {
         val validationError = validateCourseInput(name, professor, credits)
@@ -348,6 +402,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     credits = credits,
                     status = status,
                     isFavorite = isFavorite,
+                    reminderEnabled = reminderEnabled,
                     notes = notes
                 )
             }
@@ -363,6 +418,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = course.isFavorite,
+        reminderEnabled: Boolean = course.reminderEnabled,
         notes: String?
     ) {
         val validationError = validateCourseInput(name, professor, credits)
@@ -382,6 +438,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     credits = credits,
                     status = status,
                     isFavorite = isFavorite,
+                    reminderEnabled = reminderEnabled,
                     notes = notes
                 )
             }
@@ -392,6 +449,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             try {
                 _courseDetailUiState.update { it.copy(isLoading = true, errorMessage = null) }
+                reminderScheduler.cancelExamReminders(course.id)
                 repository.deleteCourse(course)
                 _selectedCourse.value = null
                 _courseDetailUiState.value = CourseDetailUiState(deleteSuccess = true)
@@ -409,6 +467,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteCourseById(courseId: Int) {
         viewModelScope.launch {
             runDatabaseOperation {
+                reminderScheduler.cancelExamReminders(courseId)
                 repository.deleteCourseById(courseId)
             }
         }
@@ -433,6 +492,39 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                 )
             } catch (exception: Exception) {
                 val message = exception.message ?: "Aggiornamento preferito non riuscito"
+                _errorMessage.value = message
+                _courseDetailUiState.update { it.copy(errorMessage = message) }
+            }
+        }
+    }
+
+    fun toggleExamReminder(course: CourseEntity) {
+        viewModelScope.launch {
+            try {
+                val nextValue = !course.reminderEnabled
+                if (nextValue && !isValidFutureExamDate(course.examDate)) {
+                    val message = reminderUnavailableMessage(course.examDate)
+                    _errorMessage.value = message
+                    _courseDetailUiState.update { it.copy(errorMessage = message) }
+                    return@launch
+                }
+
+                repository.updateReminderEnabled(
+                    courseId = course.id,
+                    enabled = nextValue
+                )
+
+                if (nextValue) {
+                    reminderScheduler.scheduleExamReminders(
+                        courseId = course.id,
+                        courseName = course.name,
+                        examDate = requireNotNull(course.examDate)
+                    )
+                } else {
+                    reminderScheduler.cancelExamReminders(course.id)
+                }
+            } catch (exception: Exception) {
+                val message = exception.message ?: "Aggiornamento promemoria non riuscito"
                 _errorMessage.value = message
                 _courseDetailUiState.update { it.copy(errorMessage = message) }
             }
@@ -535,6 +627,18 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
             professor.isBlank() -> "Il docente e obbligatorio"
             credits <= 0 -> "I CFU devono essere maggiori di 0"
             else -> null
+        }
+    }
+
+    private fun isValidFutureExamDate(examDate: Long?): Boolean {
+        return examDate != null && examDate > System.currentTimeMillis()
+    }
+
+    private fun reminderUnavailableMessage(examDate: Long?): String {
+        return if (examDate == null) {
+            "Aggiungi una data esame per attivare il promemoria"
+        } else {
+            "La data dell'esame e passata"
         }
     }
 

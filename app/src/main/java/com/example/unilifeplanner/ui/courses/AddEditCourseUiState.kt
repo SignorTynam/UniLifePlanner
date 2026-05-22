@@ -10,6 +10,7 @@ data class AddEditCourseUiState(
     val classroom: String = "",
     val credits: String = "",
     val status: CourseStatus = CourseStatus.TO_STUDY,
+    val reminderEnabled: Boolean = false,
     val notes: String = "",
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,

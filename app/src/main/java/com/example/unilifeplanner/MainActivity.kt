@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.unilifeplanner.data.datastore.SettingsDataStore
 import com.example.unilifeplanner.data.repository.SettingsRepository
 import com.example.unilifeplanner.domain.model.ThemeMode
+import com.example.unilifeplanner.notifications.NotificationHelper
 import androidx.navigation.compose.rememberNavController
 import com.example.unilifeplanner.navigation.AppNavigation
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
@@ -32,7 +33,14 @@ class MainActivity : ComponentActivity() {
 
             UniLifePlannerTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
-                AppNavigation(navController = navController)
+                val initialCourseId = intent
+                    ?.getIntExtra(NotificationHelper.EXTRA_COURSE_ID, -1)
+                    ?.takeIf { it > 0 }
+
+                AppNavigation(
+                    navController = navController,
+                    initialCourseId = initialCourseId
+                )
             }
         }
     }

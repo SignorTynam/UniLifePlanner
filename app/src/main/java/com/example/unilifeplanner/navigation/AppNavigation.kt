@@ -1,6 +1,11 @@
 package com.example.unilifeplanner.navigation
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -22,8 +27,10 @@ import com.example.unilifeplanner.ui.statistics.StatisticsScreen
 @Composable
 fun AppNavigation(
     navController: NavHostController,
-    authViewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel(),
+    initialCourseId: Int? = null
 ) {
+    var pendingCourseId by rememberSaveable { mutableStateOf(initialCourseId) }
     val startDestination = if (authViewModel.uiState.value.isAuthenticated) {
         Screen.Home.route
     } else {
@@ -196,6 +203,14 @@ fun AppNavigation(
                     navController.popBackStack()
                 }
             )
+        }
+    }
+
+    LaunchedEffect(pendingCourseId) {
+        val courseId = pendingCourseId
+        if (courseId != null && authViewModel.uiState.value.isAuthenticated) {
+            navController.navigate(Screen.CourseDetail.createRoute(courseId))
+            pendingCourseId = null
         }
     }
 }

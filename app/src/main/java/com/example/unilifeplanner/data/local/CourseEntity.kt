@@ -15,6 +15,7 @@ data class CourseEntity(
     val credits: Int,
     val status: String = CourseStatus.TO_STUDY.name,
     val isFavorite: Boolean = false,
+    val reminderEnabled: Boolean = false,
     val notes: String? = null,
     val createdAt: Long,
     val updatedAt: Long

@@ -1,5 +1,8 @@
 package com.example.unilifeplanner.ui.courses
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -37,11 +41,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.domain.model.CourseStatus
+import com.example.unilifeplanner.notifications.NotificationHelper
 import com.example.unilifeplanner.ui.courses.components.formatExamDate
 import kotlinx.coroutines.launch
 
@@ -53,6 +59,20 @@ fun AddEditCourseScreen(
 ) {
     val uiState by viewModel.addEditUiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            if (granted) {
+                viewModel.updateReminderEnabled(true)
+            } else {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Permesso notifiche non concesso")
+                }
+            }
+        }
+    )
 
     LaunchedEffect(courseId) {
         if (courseId == null) {
@@ -86,6 +106,19 @@ fun AddEditCourseScreen(
         onCreditsChange = viewModel::updateCredits,
         onStatusChange = viewModel::updateStatus,
         onNotesChange = viewModel::updateNotes,
+        onReminderEnabledChange = { enabled ->
+            if (!enabled) {
+                viewModel.updateReminderEnabled(false)
+            } else if (!isValidFutureExamDate(uiState.examDate)) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(reminderUnavailableMessage(uiState.examDate))
+                }
+            } else if (!NotificationHelper.hasNotificationPermission(context)) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                viewModel.updateReminderEnabled(true)
+            }
+        },
         onSaveClick = viewModel::saveCourse,
         onBackClick = onNavigateBack
     )
@@ -103,6 +136,7 @@ private fun AddEditCourseContent(
     onCreditsChange: (String) -> Unit,
     onStatusChange: (CourseStatus) -> Unit,
     onNotesChange: (String) -> Unit,
+    onReminderEnabledChange: (Boolean) -> Unit,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -225,6 +259,12 @@ private fun AddEditCourseContent(
                 onStatusChange = onStatusChange
             )
 
+            ReminderSwitchSection(
+                examDate = uiState.examDate,
+                reminderEnabled = uiState.reminderEnabled,
+                onReminderEnabledChange = onReminderEnabledChange
+            )
+
             OutlinedTextField(
                 value = uiState.notes,
                 onValueChange = onNotesChange,
@@ -280,6 +320,45 @@ private fun AddEditCourseContent(
 }
 
 @Composable
+private fun ReminderSwitchSection(
+    examDate: Long?,
+    reminderEnabled: Boolean,
+    onReminderEnabledChange: (Boolean) -> Unit
+) {
+    val enabled = isValidFutureExamDate(examDate)
+    val supportingText = when {
+        examDate == null -> "Aggiungi una data esame per attivare il promemoria"
+        !enabled -> "La data dell'esame e passata"
+        else -> "Invia una notifica il giorno prima e il giorno dell'esame"
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Attiva promemoria esame",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = supportingText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = reminderEnabled && enabled,
+                onCheckedChange = onReminderEnabledChange,
+                enabled = enabled
+            )
+        }
+    }
+}
+
+@Composable
 private fun CourseStatusSelector(
     selectedStatus: CourseStatus,
     onStatusChange: (CourseStatus) -> Unit
@@ -309,5 +388,17 @@ private fun statusLabel(status: CourseStatus): String {
         CourseStatus.TO_STUDY -> "Da studiare"
         CourseStatus.IN_PROGRESS -> "In corso"
         CourseStatus.COMPLETED -> "Completato"
+    }
+}
+
+private fun isValidFutureExamDate(examDate: Long?): Boolean {
+    return examDate != null && examDate > System.currentTimeMillis()
+}
+
+private fun reminderUnavailableMessage(examDate: Long?): String {
+    return if (examDate == null) {
+        "Aggiungi una data esame per attivare il promemoria"
+    } else {
+        "La data dell'esame e passata"
     }
 }
