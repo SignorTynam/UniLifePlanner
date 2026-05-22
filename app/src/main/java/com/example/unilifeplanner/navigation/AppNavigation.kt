@@ -161,6 +161,13 @@ fun AppNavigation(
 
         composable(Screen.Profile.route) {
             ProfileScreen(
+                onLogoutSuccess = {
+                    authViewModel.logout()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0)
+                        launchSingleTop = true
+                    }
+                },
                 onBackClick = {
                     navController.popBackStack()
                 }
