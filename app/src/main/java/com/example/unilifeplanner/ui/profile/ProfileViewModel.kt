@@ -1,9 +1,11 @@
 package com.example.unilifeplanner.ui.profile
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.datastore.UserProfileDataStore
+import com.example.unilifeplanner.data.local.ProfileImageStorage
 import com.example.unilifeplanner.data.repository.UserProfileRepository
 import com.example.unilifeplanner.domain.model.UserProfile
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +22,7 @@ class ProfileViewModel(
     private val repository = UserProfileRepository(
         userProfileDataStore = UserProfileDataStore(application.applicationContext)
     )
+    private val profileImageStorage = ProfileImageStorage(application.applicationContext)
 
     private val _uiState = MutableStateFlow(ProfileUiState(isLoading = true))
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
@@ -48,8 +51,28 @@ class ProfileViewModel(
         _uiState.update { it.copy(academicYear = value) }
     }
 
-    fun updateProfileImageUri(uri: String?) {
-        _uiState.update { it.copy(profileImageUri = uri) }
+    fun onProfileImageSelected(uri: Uri?) {
+        if (uri == null) return
+
+        viewModelScope.launch {
+            val savedImageUri = profileImageStorage.saveProfileImage(
+                sourceUri = uri,
+                userEmail = repository.getCurrentUserEmail()
+            )
+
+            if (savedImageUri == null) {
+                _uiState.update {
+                    it.copy(errorMessage = "Errore durante il salvataggio della foto profilo")
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        profileImageUri = savedImageUri,
+                        errorMessage = null
+                    )
+                }
+            }
+        }
     }
 
     fun saveProfile() {

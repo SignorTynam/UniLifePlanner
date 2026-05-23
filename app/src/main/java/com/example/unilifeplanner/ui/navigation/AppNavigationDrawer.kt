@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.unilifeplanner.BuildConfig
 import com.example.unilifeplanner.navigation.Screen
 import com.example.unilifeplanner.ui.components.UniLifeProfileAvatar
 
@@ -101,7 +102,7 @@ private fun AppDrawerContent(
             lastName = uiState.lastName,
             email = uiState.email,
             profileImageUri = uiState.profileImageUri,
-            appVersion = "1.0.2"
+            appVersion = BuildConfig.VERSION_NAME
         )
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))

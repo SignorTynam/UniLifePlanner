@@ -3,21 +3,26 @@ package com.example.unilifeplanner.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.unilifeplanner.data.datastore.UserProfileDataStore
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.UserProfileRepository
 import com.example.unilifeplanner.domain.model.CourseStatus
+import com.example.unilifeplanner.domain.model.UserProfile
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 data class HomeSummaryUiState(
-    val studentName: String = "studente",
+    val firstName: String = "",
+    val lastName: String = "",
+    val profileImageUri: String? = null,
     val totalCourses: Int = 0,
     val completedCourses: Int = 0,
     val inProgressCourses: Int = 0,
@@ -41,13 +46,18 @@ data class FavoriteCourseUi(
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = CourseRepository(
+    private val courseRepository = CourseRepository(
         AppDatabase.getDatabase(application).courseDao()
     )
+    private val userProfileRepository = UserProfileRepository(
+        userProfileDataStore = UserProfileDataStore(application.applicationContext)
+    )
 
-    val uiState: StateFlow<HomeSummaryUiState> = repository.allCourses
-        .map { courses ->
-            courses.toHomeSummaryUiState()
+    val uiState: StateFlow<HomeSummaryUiState> = combine(
+        courseRepository.allCourses,
+        userProfileRepository.getProfile()
+    ) { courses, profile ->
+        courses.toHomeSummaryUiState(profile)
         }
         .catch {
             emit(HomeSummaryUiState())
@@ -58,13 +68,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = HomeSummaryUiState()
         )
 
-    private fun List<CourseEntity>.toHomeSummaryUiState(): HomeSummaryUiState {
+    private fun List<CourseEntity>.toHomeSummaryUiState(profile: UserProfile): HomeSummaryUiState {
         val now = System.currentTimeMillis()
         val nextExam = asSequence()
             .filter { it.examDate != null && it.examDate >= now }
             .minByOrNull { it.examDate ?: Long.MAX_VALUE }
 
         return HomeSummaryUiState(
+            firstName = profile.firstName,
+            lastName = profile.lastName,
+            profileImageUri = profile.profileImageUri,
             totalCourses = size,
             completedCourses = count { it.status == CourseStatus.COMPLETED.name },
             inProgressCourses = count { it.status == CourseStatus.IN_PROGRESS.name },

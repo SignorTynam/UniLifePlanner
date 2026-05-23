@@ -57,7 +57,7 @@ fun ProfileScreen(
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
-            viewModel.updateProfileImageUri(uri?.toString())
+            viewModel.onProfileImageSelected(uri)
         }
     )
 

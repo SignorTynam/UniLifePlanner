@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -24,13 +25,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.unilifeplanner.ui.components.UniLifeProfileAvatar
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 
@@ -66,7 +70,11 @@ private fun HomeScreenContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                WelcomeSection(studentName = uiState.studentName)
+                WelcomeSection(
+                    firstName = uiState.firstName,
+                    lastName = uiState.lastName,
+                    profileImageUri = uiState.profileImageUri
+                )
             }
             if (uiState.totalCourses == 0) {
                 item {
@@ -91,27 +99,47 @@ private fun HomeScreenContent(
 
 @Composable
 fun WelcomeSection(
-    studentName: String,
+    firstName: String,
+    lastName: String,
+    profileImageUri: String?,
     modifier: Modifier = Modifier
 ) {
+    val displayName = listOf(firstName.trim(), lastName.trim())
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+        .ifBlank { "studente" }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Ciao, $studentName",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+        Row(
+            modifier = Modifier.padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            UniLifeProfileAvatar(
+                profileImageUri = profileImageUri,
+                size = 64.dp,
+                modifier = Modifier.size(64.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Organizza corsi, esami e scadenze in un unico posto.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Ciao, $displayName",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Organizza corsi, esami e scadenze in un unico posto.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }
@@ -333,7 +361,9 @@ private fun HomeScreenPreview() {
     UniLifePlannerTheme {
         HomeScreenContent(
             uiState = HomeSummaryUiState(
-                studentName = "studente",
+                firstName = "Mario",
+                lastName = "Rossi",
+                profileImageUri = null,
                 totalCourses = 6,
                 completedCourses = 2,
                 inProgressCourses = 3,

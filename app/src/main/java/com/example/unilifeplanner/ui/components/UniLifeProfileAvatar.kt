@@ -10,6 +10,10 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,8 +33,11 @@ fun UniLifeProfileAvatar(
         .size(size)
         .clip(CircleShape)
         .background(MaterialTheme.colorScheme.primaryContainer)
+    var showFallback by remember(profileImageUri) {
+        mutableStateOf(profileImageUri.isNullOrBlank())
+    }
 
-    if (profileImageUri.isNullOrBlank()) {
+    if (showFallback) {
         Box(
             modifier = avatarModifier,
             contentAlignment = Alignment.Center
@@ -47,7 +54,10 @@ fun UniLifeProfileAvatar(
             model = Uri.parse(profileImageUri),
             contentDescription = contentDescription,
             modifier = avatarModifier,
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            onError = {
+                showFallback = true
+            }
         )
     }
 }
