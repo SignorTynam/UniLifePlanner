@@ -13,9 +13,15 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.unilifeplanner.MainActivity
 import com.example.unilifeplanner.R
+import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 
 object NotificationHelper {
     const val EXTRA_COURSE_ID = "extra_course_id"
+    const val EXTRA_LESSON_ID = "extra_lesson_id"
+    const val CHANNEL_ID_LESSON_REMINDERS = "lesson_reminders"
+    const val CHANNEL_NAME_LESSON_REMINDERS = "Promemoria lezioni"
+    const val CHANNEL_DESCRIPTION_LESSON_REMINDERS =
+        "Notifiche locali per ricordare le lezioni"
 
     private const val CHANNEL_ID = "exam_reminders"
     private const val CHANNEL_NAME = "Promemoria esami"
@@ -24,16 +30,24 @@ object NotificationHelper {
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        val channel = NotificationChannel(
+        val examChannel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = CHANNEL_DESCRIPTION
         }
+        val lessonChannel = NotificationChannel(
+            CHANNEL_ID_LESSON_REMINDERS,
+            CHANNEL_NAME_LESSON_REMINDERS,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = CHANNEL_DESCRIPTION_LESSON_REMINDERS
+        }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(channel)
+        notificationManager.createNotificationChannel(examChannel)
+        notificationManager.createNotificationChannel(lessonChannel)
     }
 
     fun showExamReminderNotification(
@@ -79,6 +93,55 @@ object NotificationHelper {
         )
     }
 
+    fun showLessonReminderNotification(
+        context: Context,
+        courseId: Int,
+        lessonId: Int,
+        courseName: String,
+        dayOfWeek: Int,
+        startTimeMinutes: Int,
+        classroom: String?
+    ) {
+        if (!hasNotificationPermission(context)) return
+
+        createNotificationChannel(context)
+
+        val lessonTime = formatMinutesToTime(startTimeMinutes)
+        val classroomSuffix = classroom
+            ?.takeIf { it.isNotBlank() }
+            ?.let { " in $it" }
+            .orEmpty()
+        val message = "Domani hai lezione di $courseName alle $lessonTime$classroomSuffix"
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_COURSE_ID, courseId)
+            putExtra(EXTRA_LESSON_ID, lessonId)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            lessonNotificationId(lessonId),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_LESSON_REMINDERS)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Promemoria lezione")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(
+            lessonNotificationId(lessonId),
+            notification
+        )
+    }
+
     fun hasNotificationPermission(context: Context): Boolean {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(
@@ -98,4 +161,6 @@ object NotificationHelper {
 
         return courseId * 10 + suffix
     }
+
+    private fun lessonNotificationId(lessonId: Int): Int = 300_000 + lessonId
 }

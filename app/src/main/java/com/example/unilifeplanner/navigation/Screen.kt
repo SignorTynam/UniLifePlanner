@@ -23,4 +23,14 @@ sealed class Screen(val route: String) {
         fun createRoute(courseId: Int? = null): String =
             courseId?.let { "add_edit_course/$it" } ?: route
     }
+
+    data object AddEditLesson : Screen("add_edit_lesson/{courseId}") {
+        const val ARG_COURSE_ID = "courseId"
+        const val ARG_LESSON_ID = "lessonId"
+
+        const val routeWithLessonId = "add_edit_lesson/{courseId}/{lessonId}"
+
+        fun createRoute(courseId: Int, lessonId: Int? = null): String =
+            lessonId?.let { "add_edit_lesson/$courseId/$it" } ?: "add_edit_lesson/$courseId"
+    }
 }

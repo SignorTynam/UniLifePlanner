@@ -6,11 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.datastore.UserProfileDataStore
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.LessonRepository
 import com.example.unilifeplanner.data.repository.UserProfileRepository
+import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
+import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
+import com.example.unilifeplanner.domain.lessons.nextLessonDateTime
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.domain.model.UserProfile
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,6 +35,7 @@ data class HomeSummaryUiState(
     val inProgressCourses: Int = 0,
     val toStudyCourses: Int = 0,
     val nextExam: NextExamUi? = null,
+    val nextLesson: NextLessonUi? = null,
     val favoriteCourses: List<FavoriteCourseUi> = emptyList()
 )
 
@@ -38,6 +46,12 @@ data class NextExamUi(
     val status: String
 )
 
+data class NextLessonUi(
+    val courseName: String,
+    val dayAndTime: String,
+    val location: String?
+)
+
 data class FavoriteCourseUi(
     val id: Int,
     val name: String,
@@ -46,18 +60,22 @@ data class FavoriteCourseUi(
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
-    private val courseRepository = CourseRepository(
-        AppDatabase.getDatabase(application).courseDao()
-    )
+    private val database = AppDatabase.getDatabase(application)
+    private val courseRepository = CourseRepository(database.courseDao())
+    private val lessonRepository = LessonRepository(database.lessonDao())
     private val userProfileRepository = UserProfileRepository(
         userProfileDataStore = UserProfileDataStore(application.applicationContext)
     )
 
     val uiState: StateFlow<HomeSummaryUiState> = combine(
         courseRepository.allCourses,
+        lessonRepository.getAllLessons(),
         userProfileRepository.getProfile()
-    ) { courses, profile ->
-        courses.toHomeSummaryUiState(profile)
+    ) { courses, lessons, profile ->
+        courses.toHomeSummaryUiState(
+            profile = profile,
+            lessons = lessons
+        )
         }
         .catch {
             emit(HomeSummaryUiState())
@@ -68,11 +86,37 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = HomeSummaryUiState()
         )
 
-    private fun List<CourseEntity>.toHomeSummaryUiState(profile: UserProfile): HomeSummaryUiState {
+    private fun List<CourseEntity>.toHomeSummaryUiState(
+        profile: UserProfile,
+        lessons: List<LessonEntity>
+    ): HomeSummaryUiState {
         val now = System.currentTimeMillis()
         val nextExam = asSequence()
             .filter { it.examDate != null && it.examDate >= now }
             .minByOrNull { it.examDate ?: Long.MAX_VALUE }
+        val coursesById = associateBy { it.id }
+        val nowDateTime = LocalDateTime.now()
+        val nextLesson = lessons
+            .asSequence()
+            .mapNotNull { lesson ->
+                val course = coursesById[lesson.courseId] ?: return@mapNotNull null
+                val nextDateTime = nextLessonDateTime(
+                    dayOfWeek = lesson.dayOfWeek,
+                    startTimeMinutes = lesson.startTimeMinutes,
+                    now = nowDateTime
+                )
+                NextLessonCandidate(
+                    dateTime = nextDateTime,
+                    ui = NextLessonUi(
+                        courseName = course.name,
+                        dayAndTime = "${relativeDayLabel(nextDateTime.toLocalDate())}, " +
+                            formatMinutesToTime(lesson.startTimeMinutes),
+                        location = lessonLocation(lesson)
+                    )
+                )
+            }
+            .minByOrNull { it.dateTime }
+            ?.ui
 
         return HomeSummaryUiState(
             firstName = profile.firstName,
@@ -90,6 +134,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     status = statusLabel(course.status)
                 )
             },
+            nextLesson = nextLesson,
             favoriteCourses = filter { it.isFavorite }
                 .take(3)
                 .map { course ->
@@ -120,4 +165,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             else -> status
         }
     }
+
+    private fun relativeDayLabel(date: LocalDate): String {
+        val today = LocalDate.now()
+        return when (date) {
+            today -> "Oggi"
+            today.plusDays(1) -> "Domani"
+            else -> "${dayOfWeekLabel(date.dayOfWeek.value)}, ${
+                date.format(DateTimeFormatter.ofPattern("dd/MM"))
+            }"
+        }
+    }
+
+    private fun lessonLocation(lesson: LessonEntity): String? {
+        return listOfNotNull(
+            lesson.classroom?.takeIf { it.isNotBlank() },
+            lesson.building?.takeIf { it.isNotBlank() }
+        )
+            .joinToString(" - ")
+            .takeIf { it.isNotBlank() }
+    }
+
+    private data class NextLessonCandidate(
+        val dateTime: LocalDateTime,
+        val ui: NextLessonUi
+    )
 }

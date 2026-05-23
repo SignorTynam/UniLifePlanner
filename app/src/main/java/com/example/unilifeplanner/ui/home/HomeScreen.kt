@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -86,6 +87,9 @@ private fun HomeScreenContent(
             }
             item {
                 NextExamCard(nextExam = uiState.nextExam)
+            }
+            item {
+                NextLessonCard(nextLesson = uiState.nextLesson)
             }
             item {
                 StudySummaryCard(uiState = uiState)
@@ -264,6 +268,55 @@ fun NextExamCard(
 }
 
 @Composable
+fun NextLessonCard(
+    nextLesson: NextLessonUi?,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Text(
+                    text = "Prossima lezione",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            if (nextLesson == null) {
+                Text(
+                    text = "Nessuna lezione programmata",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Aggiungi le lezioni dal dettaglio di un corso.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "${nextLesson.dayAndTime} - ${nextLesson.courseName}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                nextLesson.location?.let { location ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun FavoriteCoursesSection(
     favoriteCourses: List<FavoriteCourseUi>,
     modifier: Modifier = Modifier
@@ -373,6 +426,11 @@ private fun HomeScreenPreview() {
                     examDate = "24 giugno 2026",
                     classroom = "Aula B2",
                     status = "Da preparare"
+                ),
+                nextLesson = NextLessonUi(
+                    courseName = "Basi di dati",
+                    dayAndTime = "Domani, 09:00",
+                    location = "Aula B2 - Polo Fibonacci"
                 ),
                 favoriteCourses = listOf(
                     FavoriteCourseUi(

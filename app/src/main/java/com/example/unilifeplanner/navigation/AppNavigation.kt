@@ -25,6 +25,7 @@ import com.example.unilifeplanner.ui.courses.AddEditCourseScreen
 import com.example.unilifeplanner.ui.courses.CourseDetailScreen
 import com.example.unilifeplanner.ui.courses.CoursesScreen
 import com.example.unilifeplanner.ui.home.HomeScreen
+import com.example.unilifeplanner.ui.lessons.AddEditLessonScreen
 import com.example.unilifeplanner.ui.map.MapScreen
 import com.example.unilifeplanner.ui.navigation.AppNavigationDrawer
 import com.example.unilifeplanner.ui.profile.ProfileScreen
@@ -177,6 +178,14 @@ fun AppNavigation(
                     onEditCourseClick = {
                         navController.navigate(Screen.AddEditCourse.createRoute(courseId))
                     },
+                    onAddLessonClick = { selectedCourseId ->
+                        navController.navigate(Screen.AddEditLesson.createRoute(selectedCourseId))
+                    },
+                    onEditLessonClick = { selectedCourseId, lessonId ->
+                        navController.navigate(
+                            Screen.AddEditLesson.createRoute(selectedCourseId, lessonId)
+                        )
+                    },
                     onBackClick = {
                         navController.popBackStack()
                     },
@@ -187,6 +196,53 @@ fun AppNavigation(
                             }
                             launchSingleTop = true
                         }
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.AddEditLesson.route,
+                arguments = listOf(
+                    navArgument(Screen.AddEditLesson.ARG_COURSE_ID) {
+                        type = NavType.IntType
+                    }
+                )
+            ) { backStackEntry ->
+                val courseId = backStackEntry.arguments
+                    ?.getInt(Screen.AddEditLesson.ARG_COURSE_ID)
+                    ?: 0
+
+                AddEditLessonScreen(
+                    courseId = courseId,
+                    lessonId = null,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.AddEditLesson.routeWithLessonId,
+                arguments = listOf(
+                    navArgument(Screen.AddEditLesson.ARG_COURSE_ID) {
+                        type = NavType.IntType
+                    },
+                    navArgument(Screen.AddEditLesson.ARG_LESSON_ID) {
+                        type = NavType.IntType
+                    }
+                )
+            ) { backStackEntry ->
+                val courseId = backStackEntry.arguments
+                    ?.getInt(Screen.AddEditLesson.ARG_COURSE_ID)
+                    ?: 0
+                val lessonId = backStackEntry.arguments
+                    ?.getInt(Screen.AddEditLesson.ARG_LESSON_ID)
+
+                AddEditLessonScreen(
+                    courseId = courseId,
+                    lessonId = lessonId,
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }

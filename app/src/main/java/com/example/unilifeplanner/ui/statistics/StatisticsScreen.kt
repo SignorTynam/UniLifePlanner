@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditScore
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -199,6 +200,28 @@ private fun StatisticsSummaryCard(uiState: StatisticsUiState) {
                 title = "CFU totali",
                 value = uiState.totalCredits.toString(),
                 icon = Icons.Filled.CreditScore,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatisticItemCard(
+                title = "Lezioni sett.",
+                value = uiState.totalWeeklyLessons.toString(),
+                icon = Icons.Filled.Schedule,
+                modifier = Modifier.weight(1f)
+            )
+            StatisticItemCard(
+                title = "Ore lezioni",
+                value = uiState.weeklyLessonHours,
+                icon = Icons.Filled.HourglassTop,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatisticItemCard(
+                title = "Giorno lezioni",
+                value = uiState.busiestLessonDay ?: "-",
+                icon = Icons.Filled.CalendarMonth,
                 modifier = Modifier.weight(1f)
             )
         }

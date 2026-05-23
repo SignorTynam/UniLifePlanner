@@ -5,9 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.LessonRepository
+import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
+import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.notifications.ExamReminderScheduler
+import com.example.unilifeplanner.notifications.LessonReminderScheduler
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,10 +26,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class CourseViewModel(application: Application) : AndroidViewModel(application) {
+    private val database = AppDatabase.getDatabase(application)
     private val repository = CourseRepository(
-        AppDatabase.getDatabase(application).courseDao()
+        database.courseDao()
+    )
+    private val lessonRepository = LessonRepository(
+        database.lessonDao()
     )
     private val reminderScheduler = ExamReminderScheduler(application.applicationContext)
+    private val lessonReminderScheduler = LessonReminderScheduler(application.applicationContext)
 
     private val _allCourses = MutableStateFlow<List<CourseEntity>>(emptyList())
 
@@ -113,18 +123,26 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         selectedCourseJob?.cancel()
         selectedCourseJob = viewModelScope.launch {
             _courseDetailUiState.value = CourseDetailUiState(isLoading = true)
-            repository.getCourseById(courseId)
+            combine(
+                repository.getCourseById(courseId),
+                lessonRepository.getLessonsForCourse(courseId)
+            ) { course, lessons ->
+                course to lessons
+            }
                 .catch { throwable ->
                     val message = throwable.message ?: "Errore nel caricamento del corso"
                     _errorMessage.value = message
                     _courseDetailUiState.value = CourseDetailUiState(errorMessage = message)
                 }
-                .collect { course ->
+                .collect { (course, lessons) ->
                     _selectedCourse.value = course
                     _courseDetailUiState.value = if (course == null) {
                         CourseDetailUiState(errorMessage = "Corso non trovato.")
                     } else {
-                        CourseDetailUiState(course = course)
+                        CourseDetailUiState(
+                            course = course,
+                            lessons = lessons.map { lesson -> lesson.toLessonUi() }
+                        )
                     }
                 }
         }
@@ -450,6 +468,10 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 _courseDetailUiState.update { it.copy(isLoading = true, errorMessage = null) }
                 reminderScheduler.cancelExamReminders(course.id)
+                lessonRepository.getLessonsForCourse(course.id).first()
+                    .forEach { lesson ->
+                        lessonReminderScheduler.cancelLessonReminder(lesson.id)
+                    }
                 repository.deleteCourse(course)
                 _selectedCourse.value = null
                 _courseDetailUiState.value = CourseDetailUiState(deleteSuccess = true)
@@ -468,6 +490,10 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             runDatabaseOperation {
                 reminderScheduler.cancelExamReminders(courseId)
+                lessonRepository.getLessonsForCourse(courseId).first()
+                    .forEach { lesson ->
+                        lessonReminderScheduler.cancelLessonReminder(lesson.id)
+                    }
                 repository.deleteCourseById(courseId)
             }
         }
@@ -525,6 +551,66 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } catch (exception: Exception) {
                 val message = exception.message ?: "Aggiornamento promemoria non riuscito"
+                _errorMessage.value = message
+                _courseDetailUiState.update { it.copy(errorMessage = message) }
+            }
+        }
+    }
+
+    fun onDeleteLesson(lessonId: Int) {
+        viewModelScope.launch {
+            try {
+                lessonReminderScheduler.cancelLessonReminder(lessonId)
+                lessonRepository.deleteLessonById(lessonId)
+            } catch (exception: Exception) {
+                val message = exception.message ?: "Eliminazione lezione non riuscita"
+                _errorMessage.value = message
+                _courseDetailUiState.update { it.copy(errorMessage = message) }
+            }
+        }
+    }
+
+    fun onToggleLessonReminder(
+        lessonId: Int,
+        enabled: Boolean
+    ) {
+        viewModelScope.launch {
+            try {
+                val lesson = lessonRepository.getLessonById(lessonId).first()
+                if (lesson == null) {
+                    val message = "Lezione non trovata"
+                    _errorMessage.value = message
+                    _courseDetailUiState.update { it.copy(errorMessage = message) }
+                    return@launch
+                }
+
+                lessonRepository.updateLessonReminderEnabled(
+                    lessonId = lessonId,
+                    enabled = enabled
+                )
+
+                if (enabled) {
+                    val course = repository.getCourseById(lesson.courseId).first()
+                    if (course == null) {
+                        val message = "Corso non trovato"
+                        _errorMessage.value = message
+                        _courseDetailUiState.update { it.copy(errorMessage = message) }
+                        return@launch
+                    }
+
+                    lessonReminderScheduler.scheduleLessonReminder(
+                        lessonId = lesson.id,
+                        courseId = lesson.courseId,
+                        courseName = course.name,
+                        dayOfWeek = lesson.dayOfWeek,
+                        startTimeMinutes = lesson.startTimeMinutes,
+                        classroom = lesson.classroom
+                    )
+                } else {
+                    lessonReminderScheduler.cancelLessonReminder(lessonId)
+                }
+            } catch (exception: Exception) {
+                val message = exception.message ?: "Aggiornamento promemoria lezione non riuscito"
                 _errorMessage.value = message
                 _courseDetailUiState.update { it.copy(errorMessage = message) }
             }
@@ -673,5 +759,20 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                 saveSuccess = false
             )
         }
+    }
+
+    private fun LessonEntity.toLessonUi(): LessonUi {
+        return LessonUi(
+            id = id,
+            courseId = courseId,
+            dayOfWeek = dayOfWeek,
+            dayLabel = dayOfWeekLabel(dayOfWeek),
+            startTime = formatMinutesToTime(startTimeMinutes),
+            endTime = formatMinutesToTime(endTimeMinutes),
+            classroom = classroom,
+            building = building,
+            notes = notes,
+            reminderEnabled = reminderEnabled
+        )
     }
 }

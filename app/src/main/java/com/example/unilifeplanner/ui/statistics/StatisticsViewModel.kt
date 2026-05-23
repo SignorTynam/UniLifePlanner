@@ -5,30 +5,40 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.LessonRepository
+import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
+import com.example.unilifeplanner.domain.lessons.weeklyLessonDurationMinutes
 import com.example.unilifeplanner.domain.model.CourseStatus
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 class StatisticsViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
-    private val repository = CourseRepository(
-        AppDatabase.getDatabase(application.applicationContext).courseDao()
-    )
+    private val database = AppDatabase.getDatabase(application.applicationContext)
+    private val repository = CourseRepository(database.courseDao())
+    private val lessonRepository = LessonRepository(database.lessonDao())
 
-    val uiState: StateFlow<StatisticsUiState> = repository.allCourses
-        .map { courses -> courses.toStatisticsUiState() }
+    val uiState: StateFlow<StatisticsUiState> = combine(
+        repository.allCourses,
+        lessonRepository.getAllLessons()
+    ) { courses, lessons ->
+        courses.toStatisticsUiState(lessons)
+    }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = StatisticsUiState()
         )
 
-    private fun List<CourseEntity>.toStatisticsUiState(): StatisticsUiState {
+    private fun List<CourseEntity>.toStatisticsUiState(
+        lessons: List<LessonEntity>
+    ): StatisticsUiState {
         if (isEmpty()) {
             return StatisticsUiState()
         }
@@ -48,6 +58,18 @@ class StatisticsViewModel(
         val nextExam = asSequence()
             .filter { course -> course.examDate != null && course.examDate > now }
             .minByOrNull { course -> requireNotNull(course.examDate) }
+        val busiestLessonDay = lessons
+            .groupingBy { lesson -> lesson.dayOfWeek }
+            .eachCount()
+            .maxWithOrNull(compareBy<Map.Entry<Int, Int>> { it.value }.thenBy { -it.key })
+            ?.key
+            ?.let { dayOfWeekLabel(it) }
+        val weeklyLessonMinutes = lessons.sumOf { lesson ->
+            weeklyLessonDurationMinutes(
+                startTimeMinutes = lesson.startTimeMinutes,
+                endTimeMinutes = lesson.endTimeMinutes
+            )
+        }
 
         return StatisticsUiState(
             totalCourses = size,
@@ -55,6 +77,9 @@ class StatisticsViewModel(
             inProgressCourses = inProgressCourses,
             toStudyCourses = toStudyCourses,
             favoriteCourses = count { it.isFavorite },
+            totalWeeklyLessons = lessons.size,
+            busiestLessonDay = busiestLessonDay,
+            weeklyLessonHours = formatLessonHours(weeklyLessonMinutes),
             totalCredits = totalCredits,
             completedCredits = completedCredits,
             completionPercentage = completionPercentage.coerceIn(0f, 1f),
@@ -66,5 +91,15 @@ class StatisticsViewModel(
 
     private fun List<CourseEntity>.countByStatus(status: CourseStatus): Int {
         return count { course -> course.status == status.name }
+    }
+
+    private fun formatLessonHours(totalMinutes: Int): String {
+        val hours = totalMinutes / 60
+        val minutes = totalMinutes % 60
+        return if (minutes == 0) {
+            "${hours}h"
+        } else {
+            "${hours}h ${minutes}min"
+        }
     }
 }
