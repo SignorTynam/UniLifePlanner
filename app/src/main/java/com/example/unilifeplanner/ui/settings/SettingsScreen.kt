@@ -31,7 +31,7 @@ import com.example.unilifeplanner.ui.components.UniLifeTopBar
 
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit,
+    onMenuClick: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -40,7 +40,7 @@ fun SettingsScreen(
         topBar = {
             UniLifeTopBar(
                 title = "Impostazioni",
-                onBackClick = onBackClick
+                onMenuClick = onMenuClick
             )
         }
     ) { innerPadding ->

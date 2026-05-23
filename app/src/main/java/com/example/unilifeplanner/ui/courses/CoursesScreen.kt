@@ -55,7 +55,7 @@ fun CoursesScreen(
     viewModel: CourseViewModel = viewModel(),
     onAddCourseClick: () -> Unit,
     onCourseClick: (Int) -> Unit,
-    onBackClick: () -> Unit
+    onMenuClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -69,7 +69,7 @@ fun CoursesScreen(
         onAddCourseClick = onAddCourseClick,
         onCourseClick = onCourseClick,
         onFavoriteClick = viewModel::toggleFavorite,
-        onBackClick = onBackClick
+        onMenuClick = onMenuClick
     )
 }
 
@@ -85,13 +85,13 @@ private fun CoursesScreenContent(
     onAddCourseClick: () -> Unit,
     onCourseClick: (Int) -> Unit,
     onFavoriteClick: (CourseEntity) -> Unit,
-    onBackClick: () -> Unit
+    onMenuClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
             UniLifeTopBar(
                 title = "Corsi ed esami",
-                onBackClick = onBackClick
+                onMenuClick = onMenuClick
             )
         },
         floatingActionButton = {

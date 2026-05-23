@@ -18,14 +18,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +32,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.domain.model.PlaceType
 import com.example.unilifeplanner.domain.model.UniversityPlace
+import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -62,7 +60,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun MapScreen(
-    onBackClick: () -> Unit,
+    onMenuClick: () -> Unit,
     viewModel: MapViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -88,7 +86,7 @@ fun MapScreen(
     MapScreenContent(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
-        onBackClick = onBackClick,
+        onMenuClick = onMenuClick,
         onRequestPermissionClick = {
             permissionLauncher.launch(
                 arrayOf(
@@ -110,12 +108,11 @@ fun MapScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MapScreenContent(
     uiState: MapUiState,
     snackbarHostState: SnackbarHostState,
-    onBackClick: () -> Unit,
+    onMenuClick: () -> Unit,
     onRequestPermissionClick: () -> Unit,
     onRefreshLocationClick: () -> Unit,
     onPlaceClick: (UniversityPlace) -> Unit,
@@ -123,16 +120,9 @@ private fun MapScreenContent(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(text = "Mappa") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Indietro"
-                        )
-                    }
-                },
+            UniLifeTopBar(
+                title = "Mappa",
+                onMenuClick = onMenuClick,
                 actions = {
                     IconButton(
                         onClick = onRefreshLocationClick,

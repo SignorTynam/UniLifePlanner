@@ -17,13 +17,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditScore
 import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,7 +51,7 @@ import java.util.Locale
 
 @Composable
 fun StatisticsScreen(
-    onBackClick: () -> Unit,
+    onMenuClick: () -> Unit,
     viewModel: StatisticsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -60,7 +60,7 @@ fun StatisticsScreen(
         topBar = {
             UniLifeTopBar(
                 title = "Statistiche",
-                onBackClick = onBackClick
+                onMenuClick = onMenuClick
             )
         }
     ) { innerPadding ->
@@ -164,7 +164,7 @@ private fun StatisticsSummaryCard(uiState: StatisticsUiState) {
             StatisticItemCard(
                 title = "Corsi totali",
                 value = uiState.totalCourses.toString(),
-                icon = Icons.Filled.MenuBook,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 modifier = Modifier.weight(1f)
             )
             StatisticItemCard(
