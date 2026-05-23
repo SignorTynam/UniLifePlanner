@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CourseEntity::class,
         LessonEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,7 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "unilife_planner_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
 
                 INSTANCE = instance
@@ -69,6 +69,63 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_lessons_courseId ON lessons(courseId)"
                 )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE courses_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        professor TEXT NOT NULL,
+                        examDate INTEGER,
+                        credits INTEGER NOT NULL,
+                        status TEXT NOT NULL,
+                        isFavorite INTEGER NOT NULL,
+                        reminderEnabled INTEGER NOT NULL,
+                        notes TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    INSERT INTO courses_new (
+                        id,
+                        name,
+                        professor,
+                        examDate,
+                        credits,
+                        status,
+                        isFavorite,
+                        reminderEnabled,
+                        notes,
+                        createdAt,
+                        updatedAt
+                    )
+                    SELECT
+                        id,
+                        name,
+                        professor,
+                        examDate,
+                        credits,
+                        status,
+                        isFavorite,
+                        reminderEnabled,
+                        notes,
+                        createdAt,
+                        updatedAt
+                    FROM courses
+                    """.trimIndent()
+                )
+
+                db.execSQL("DROP TABLE courses")
+                db.execSQL("ALTER TABLE courses_new RENAME TO courses")
+                db.execSQL("ALTER TABLE lessons ADD COLUMN locationQuery TEXT")
             }
         }
     }

@@ -177,7 +177,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     name = course.name,
                     professor = course.professor,
                     examDate = course.examDate,
-                    classroom = course.classroom.orEmpty(),
                     credits = course.credits.toString(),
                     status = CourseStatus.entries.firstOrNull { it.name == course.status }
                         ?: CourseStatus.TO_STUDY,
@@ -226,12 +225,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                 errorMessage = null,
                 saveSuccess = false
             )
-        }
-    }
-
-    fun updateClassroom(value: String) {
-        _addEditUiState.update {
-            it.copy(classroom = value, errorMessage = null, saveSuccess = false)
         }
     }
 
@@ -294,7 +287,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         name = state.name,
                         professor = state.professor,
                         examDate = state.examDate,
-                        classroom = state.classroom,
                         credits = requireNotNull(creditsValue),
                         status = state.status,
                         reminderEnabled = shouldEnableReminder,
@@ -328,7 +320,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         name = state.name,
                         professor = state.professor,
                         examDate = state.examDate,
-                        classroom = state.classroom,
                         credits = requireNotNull(creditsValue),
                         status = state.status,
                         reminderEnabled = shouldEnableReminder,
@@ -397,7 +388,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         name: String,
         professor: String,
         examDate: Long?,
-        classroom: String?,
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = false,
@@ -416,7 +406,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     name = name,
                     professor = professor,
                     examDate = examDate,
-                    classroom = classroom,
                     credits = credits,
                     status = status,
                     isFavorite = isFavorite,
@@ -432,7 +421,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         name: String,
         professor: String,
         examDate: Long?,
-        classroom: String?,
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = course.isFavorite,
@@ -452,7 +440,6 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     name = name,
                     professor = professor,
                     examDate = examDate,
-                    classroom = classroom,
                     credits = credits,
                     status = status,
                     isFavorite = isFavorite,
@@ -668,8 +655,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
             .filter { course ->
                 normalizedQuery.isBlank() ||
                     course.name.contains(normalizedQuery, ignoreCase = true) ||
-                    course.professor.contains(normalizedQuery, ignoreCase = true) ||
-                    course.classroom.orEmpty().contains(normalizedQuery, ignoreCase = true)
+                    course.professor.contains(normalizedQuery, ignoreCase = true)
             }
             .filter { course ->
                 statusFilter == CourseStatusFilter.ALL || course.status == statusFilter.name

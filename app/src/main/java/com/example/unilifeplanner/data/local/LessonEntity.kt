@@ -28,6 +28,7 @@ data class LessonEntity(
     val endTimeMinutes: Int,
     val classroom: String? = null,
     val building: String? = null,
+    val locationQuery: String? = null,
     val notes: String? = null,
     val reminderEnabled: Boolean = true,
     val createdAt: Long,

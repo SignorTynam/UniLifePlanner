@@ -37,6 +37,27 @@ interface LessonDao {
     @Query("SELECT * FROM lessons ORDER BY dayOfWeek ASC, startTimeMinutes ASC")
     fun getAllLessons(): Flow<List<LessonEntity>>
 
+    @Query(
+        """
+        SELECT lessons.*, courses.name AS courseName, courses.professor AS courseProfessor
+        FROM lessons
+        INNER JOIN courses ON lessons.courseId = courses.id
+        ORDER BY lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
+        """
+    )
+    fun getLessonsWithCourse(): Flow<List<LessonWithCourse>>
+
+    @Query(
+        """
+        SELECT lessons.*, courses.name AS courseName, courses.professor AS courseProfessor
+        FROM lessons
+        INNER JOIN courses ON lessons.courseId = courses.id
+        WHERE lessons.courseId = :courseId
+        ORDER BY lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
+        """
+    )
+    fun getLessonsWithCourseForCourse(courseId: Int): Flow<List<LessonWithCourse>>
+
     @Query("SELECT * FROM lessons WHERE reminderEnabled = 1")
     suspend fun getLessonsWithReminderEnabled(): List<LessonEntity>
 

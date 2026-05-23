@@ -88,6 +88,7 @@ class AddEditLessonViewModel(
                     endTime = formatMinutesToTime(lesson.endTimeMinutes),
                     classroom = lesson.classroom.orEmpty(),
                     building = lesson.building.orEmpty(),
+                    locationQuery = lesson.locationQuery.orEmpty(),
                     notes = lesson.notes.orEmpty(),
                     reminderEnabled = lesson.reminderEnabled,
                     isLoading = false
@@ -143,6 +144,10 @@ class AddEditLessonViewModel(
 
     fun updateBuilding(value: String) {
         _uiState.update { it.copy(building = value, errorMessage = null, saveSuccess = false) }
+    }
+
+    fun updateLocationQuery(value: String) {
+        _uiState.update { it.copy(locationQuery = value, errorMessage = null, saveSuccess = false) }
     }
 
     fun updateNotes(value: String) {
@@ -208,6 +213,7 @@ class AddEditLessonViewModel(
                     endTimeMinutes = requireNotNull(endMinutes),
                     classroom = state.classroom,
                     building = state.building,
+                    locationQuery = state.locationQuery,
                     notes = state.notes,
                     reminderEnabled = state.reminderEnabled,
                     createdAt = selectedLesson?.createdAt ?: System.currentTimeMillis(),

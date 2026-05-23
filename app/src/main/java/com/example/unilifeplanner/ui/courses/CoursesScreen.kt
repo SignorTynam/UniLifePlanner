@@ -172,7 +172,7 @@ private fun CoursesFilters(
             value = uiState.searchQuery,
             onValueChange = onSearchQueryChange,
             label = { Text(text = "Cerca") },
-            placeholder = { Text(text = "Nome, docente o aula") },
+            placeholder = { Text(text = "Nome o docente") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Filled.Search,

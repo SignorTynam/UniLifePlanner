@@ -100,9 +100,6 @@ fun CourseCard(
                 StatusPill(status = course.status)
                 InfoPill(text = "${course.credits} CFU")
                 InfoPill(text = formatExamDate(course.examDate))
-                course.classroom?.takeIf { it.isNotBlank() }?.let { classroom ->
-                    InfoPill(text = classroom)
-                }
             }
         }
     }
@@ -180,7 +177,6 @@ private fun CourseCardPreview() {
                 name = "Programmazione Mobile",
                 professor = "Prof. Rossi",
                 examDate = 1782345600000,
-                classroom = "A2",
                 credits = 6,
                 status = CourseStatus.IN_PROGRESS.name,
                 isFavorite = true,

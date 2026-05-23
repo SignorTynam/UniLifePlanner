@@ -26,6 +26,7 @@ import com.example.unilifeplanner.ui.courses.CourseDetailScreen
 import com.example.unilifeplanner.ui.courses.CoursesScreen
 import com.example.unilifeplanner.ui.home.HomeScreen
 import com.example.unilifeplanner.ui.lessons.AddEditLessonScreen
+import com.example.unilifeplanner.ui.lessons.LessonsScreen
 import com.example.unilifeplanner.ui.map.MapScreen
 import com.example.unilifeplanner.ui.navigation.AppNavigationDrawer
 import com.example.unilifeplanner.ui.profile.ProfileScreen
@@ -53,11 +54,14 @@ fun AppNavigation(
     val topLevelRoutes = setOf(
         Screen.Home.route,
         Screen.Courses.route,
+        Screen.Lessons.route,
+        Screen.Lessons.createRoute(),
         Screen.Statistics.route,
         Screen.Map.route,
         Screen.Profile.route,
         Screen.Settings.route
     )
+    val isTopLevelRoute = currentRoute in topLevelRoutes || isLessonsRoute(currentRoute)
     val onOpenDrawer: () -> Unit = {
         coroutineScope.launch {
             drawerState.open()
@@ -96,9 +100,10 @@ fun AppNavigation(
         drawerState = drawerState,
         currentRoute = currentRoute,
         isAuthenticated = authUiState.isAuthenticated,
-        gesturesEnabled = currentRoute in topLevelRoutes,
+        gesturesEnabled = isTopLevelRoute,
         onNavigateHome = { navigateToTopLevel(Screen.Home.route) },
         onNavigateCourses = { navigateToTopLevel(Screen.Courses.route) },
+        onNavigateLessons = { navigateToTopLevel(Screen.Lessons.createRoute()) },
         onNavigateStatistics = { navigateToTopLevel(Screen.Statistics.route) },
         onNavigateMap = { navigateToTopLevel(Screen.Map.route) },
         onNavigateProfile = { navigateToTopLevel(Screen.Profile.route) },
@@ -162,6 +167,36 @@ fun AppNavigation(
             }
 
             composable(
+                route = Screen.Lessons.route,
+                arguments = listOf(
+                    navArgument(Screen.Lessons.ARG_COURSE_ID) {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    }
+                )
+            ) { backStackEntry ->
+                val courseId = backStackEntry.arguments
+                    ?.getInt(Screen.Lessons.ARG_COURSE_ID)
+                    ?.takeIf { it > 0 }
+
+                LessonsScreen(
+                    initialCourseId = courseId,
+                    onMenuClick = onOpenDrawer,
+                    onLessonClick = { selectedCourseId, lessonId ->
+                        navController.navigate(
+                            Screen.AddEditLesson.createRoute(selectedCourseId, lessonId)
+                        )
+                    },
+                    onAddLessonClick = { selectedCourseId ->
+                        navController.navigate(Screen.AddEditLesson.createRoute(selectedCourseId))
+                    },
+                    onOpenCourseClick = { selectedCourseId ->
+                        navController.navigate(Screen.CourseDetail.createRoute(selectedCourseId))
+                    }
+                )
+            }
+
+            composable(
                 route = Screen.CourseDetail.route,
                 arguments = listOf(
                     navArgument(Screen.CourseDetail.ARG_COURSE_ID) {
@@ -178,13 +213,8 @@ fun AppNavigation(
                     onEditCourseClick = {
                         navController.navigate(Screen.AddEditCourse.createRoute(courseId))
                     },
-                    onAddLessonClick = { selectedCourseId ->
-                        navController.navigate(Screen.AddEditLesson.createRoute(selectedCourseId))
-                    },
-                    onEditLessonClick = { selectedCourseId, lessonId ->
-                        navController.navigate(
-                            Screen.AddEditLesson.createRoute(selectedCourseId, lessonId)
-                        )
+                    onOpenCourseLessonsClick = { selectedCourseId ->
+                        navController.navigate(Screen.Lessons.createRoute(selectedCourseId))
                     },
                     onBackClick = {
                         navController.popBackStack()
@@ -315,4 +345,8 @@ fun AppNavigation(
             pendingCourseId = null
         }
     }
+}
+
+private fun isLessonsRoute(currentRoute: String?): Boolean {
+    return currentRoute?.startsWith("lessons") == true || currentRoute == Screen.Lessons.route
 }

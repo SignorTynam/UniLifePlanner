@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.School
@@ -46,6 +47,7 @@ fun AppNavigationDrawer(
     gesturesEnabled: Boolean,
     onNavigateHome: () -> Unit,
     onNavigateCourses: () -> Unit,
+    onNavigateLessons: () -> Unit,
     onNavigateStatistics: () -> Unit,
     onNavigateMap: () -> Unit,
     onNavigateProfile: () -> Unit,
@@ -73,6 +75,7 @@ fun AppNavigationDrawer(
                 currentRoute = currentRoute,
                 onNavigateHome = onNavigateHome,
                 onNavigateCourses = onNavigateCourses,
+                onNavigateLessons = onNavigateLessons,
                 onNavigateStatistics = onNavigateStatistics,
                 onNavigateMap = onNavigateMap,
                 onNavigateProfile = onNavigateProfile,
@@ -90,6 +93,7 @@ private fun AppDrawerContent(
     currentRoute: String?,
     onNavigateHome: () -> Unit,
     onNavigateCourses: () -> Unit,
+    onNavigateLessons: () -> Unit,
     onNavigateStatistics: () -> Unit,
     onNavigateMap: () -> Unit,
     onNavigateProfile: () -> Unit,
@@ -117,6 +121,12 @@ private fun AppDrawerContent(
             icon = Icons.Filled.School,
             selected = currentRoute == Screen.Courses.route,
             onClick = onNavigateCourses
+        )
+        AppDrawerItem(
+            label = "Lezioni",
+            icon = Icons.Filled.Event,
+            selected = isLessonsRoute(currentRoute),
+            onClick = onNavigateLessons
         )
         AppDrawerItem(
             label = "Statistiche",
@@ -230,4 +240,8 @@ private fun AppDrawerItem(
             )
         }
     )
+}
+
+private fun isLessonsRoute(currentRoute: String?): Boolean {
+    return currentRoute?.startsWith("lessons") == true || currentRoute == Screen.Lessons.route
 }

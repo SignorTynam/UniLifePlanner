@@ -15,14 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -71,8 +68,7 @@ fun CourseDetailScreen(
     courseId: Int,
     viewModel: CourseViewModel = viewModel(),
     onEditCourseClick: () -> Unit,
-    onAddLessonClick: (Int) -> Unit,
-    onEditLessonClick: (Int, Int) -> Unit,
+    onOpenCourseLessonsClick: (Int) -> Unit,
     onBackClick: () -> Unit,
     onCourseDeleted: () -> Unit
 ) {
@@ -80,30 +76,12 @@ fun CourseDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var pendingLessonReminderToggle by remember { mutableStateOf<LessonUi?>(null) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
             val course = uiState.course
             if (granted && course != null) {
                 viewModel.toggleExamReminder(course)
-            } else {
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Permesso notifiche non concesso")
-                }
-            }
-        }
-    )
-    val lessonNotificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            val lesson = pendingLessonReminderToggle
-            pendingLessonReminderToggle = null
-            if (granted && lesson != null) {
-                viewModel.onToggleLessonReminder(
-                    lessonId = lesson.id,
-                    enabled = true
-                )
             } else {
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar("Permesso notifiche non concesso")
@@ -135,8 +113,7 @@ fun CourseDetailScreen(
         snackbarHostState = snackbarHostState,
         onBackClick = onBackClick,
         onEditCourseClick = onEditCourseClick,
-        onAddLessonClick = onAddLessonClick,
-        onEditLessonClick = onEditLessonClick,
+        onOpenCourseLessonsClick = onOpenCourseLessonsClick,
         onToggleFavorite = { course -> viewModel.toggleFavorite(course) },
         onToggleReminder = { course ->
             if (course.reminderEnabled) {
@@ -151,24 +128,7 @@ fun CourseDetailScreen(
                 viewModel.toggleExamReminder(course)
             }
         },
-        onDeleteCourse = { course -> viewModel.deleteCourse(course) },
-        onDeleteLesson = { lessonId -> viewModel.onDeleteLesson(lessonId) },
-        onToggleLessonReminder = { lesson, enabled ->
-            if (!enabled) {
-                viewModel.onToggleLessonReminder(
-                    lessonId = lesson.id,
-                    enabled = false
-                )
-            } else if (!NotificationHelper.hasNotificationPermission(context)) {
-                pendingLessonReminderToggle = lesson
-                lessonNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                viewModel.onToggleLessonReminder(
-                    lessonId = lesson.id,
-                    enabled = true
-                )
-            }
-        }
+        onDeleteCourse = { course -> viewModel.deleteCourse(course) }
     )
 }
 
@@ -179,17 +139,12 @@ private fun CourseDetailContent(
     snackbarHostState: SnackbarHostState,
     onBackClick: () -> Unit,
     onEditCourseClick: () -> Unit,
-    onAddLessonClick: (Int) -> Unit,
-    onEditLessonClick: (Int, Int) -> Unit,
+    onOpenCourseLessonsClick: (Int) -> Unit,
     onToggleFavorite: (CourseEntity) -> Unit,
     onToggleReminder: (CourseEntity) -> Unit,
-    onDeleteCourse: (CourseEntity) -> Unit,
-    onDeleteLesson: (Int) -> Unit,
-    onToggleLessonReminder: (LessonUi, Boolean) -> Unit
+    onDeleteCourse: (CourseEntity) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var lessonToDelete by remember { mutableStateOf<LessonUi?>(null) }
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val course = uiState.course
 
@@ -233,14 +188,10 @@ private fun CourseDetailContent(
                 course == null -> CourseDetailErrorState(message = "Corso non trovato.")
                 else -> CourseDetailBody(
                     course = course,
-                    lessons = uiState.lessons,
                     onEditCourseClick = onEditCourseClick,
-                    onAddLessonClick = onAddLessonClick,
-                    onEditLessonClick = onEditLessonClick,
                     onDeleteClick = { showDeleteDialog = true },
-                    onDeleteLessonClick = { lesson -> lessonToDelete = lesson },
                     onToggleReminder = onToggleReminder,
-                    onToggleLessonReminder = onToggleLessonReminder,
+                    onOpenCourseLessonsClick = onOpenCourseLessonsClick,
                     onExternalActionMessage = { message ->
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar(message)
@@ -274,45 +225,15 @@ private fun CourseDetailContent(
         )
     }
 
-    lessonToDelete?.let { lesson ->
-        AlertDialog(
-            onDismissRequest = { lessonToDelete = null },
-            title = { Text(text = "Eliminare lezione?") },
-            text = {
-                Text(
-                    text = "La lezione di ${lesson.dayLabel} ${lesson.startTime} - ${lesson.endTime} verra rimossa."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        lessonToDelete = null
-                        onDeleteLesson(lesson.id)
-                    }
-                ) {
-                    Text(text = "Elimina")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { lessonToDelete = null }) {
-                    Text(text = "Annulla")
-                }
-            }
-        )
-    }
 }
 
 @Composable
 private fun CourseDetailBody(
     course: CourseEntity,
-    lessons: List<LessonUi>,
     onEditCourseClick: () -> Unit,
-    onAddLessonClick: (Int) -> Unit,
-    onEditLessonClick: (Int, Int) -> Unit,
     onDeleteClick: () -> Unit,
-    onDeleteLessonClick: (LessonUi) -> Unit,
     onToggleReminder: (CourseEntity) -> Unit,
-    onToggleLessonReminder: (LessonUi, Boolean) -> Unit,
+    onOpenCourseLessonsClick: (Int) -> Unit,
     onExternalActionMessage: (String) -> Unit
 ) {
     LazyColumn(
@@ -330,13 +251,9 @@ private fun CourseDetailBody(
             )
         }
         item {
-            LessonsSection(
+            CourseLessonsLinkCard(
                 courseId = course.id,
-                lessons = lessons,
-                onAddLessonClick = onAddLessonClick,
-                onEditLessonClick = onEditLessonClick,
-                onDeleteLessonClick = onDeleteLessonClick,
-                onToggleLessonReminder = onToggleLessonReminder
+                onOpenCourseLessonsClick = onOpenCourseLessonsClick
             )
         }
         item {
@@ -358,172 +275,33 @@ private fun CourseDetailBody(
 }
 
 @Composable
-private fun LessonsSection(
+private fun CourseLessonsLinkCard(
     courseId: Int,
-    lessons: List<LessonUi>,
-    onAddLessonClick: (Int) -> Unit,
-    onEditLessonClick: (Int, Int) -> Unit,
-    onDeleteLessonClick: (LessonUi) -> Unit,
-    onToggleLessonReminder: (LessonUi, Boolean) -> Unit
+    onOpenCourseLessonsClick: (Int) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
                 text = "Lezioni",
                 style = MaterialTheme.typography.titleLarge
             )
-            Button(onClick = { onAddLessonClick(courseId) }) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarMonth,
-                    contentDescription = "Aggiungi lezione"
-                )
+            Text(
+                text = "Visualizza e gestisci le lezioni settimanali di questo corso.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedButton(
+                onClick = { onOpenCourseLessonsClick(courseId) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Vai alle lezioni di questo corso")
                 Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Text(text = "Aggiungi lezione")
-            }
-        }
-
-        if (lessons.isEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "Nessuna lezione inserita",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "Aggiungi giorni e orari delle lezioni per ricevere promemoria.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        } else {
-            lessons.forEach { lesson ->
-                LessonCard(
-                    lesson = lesson,
-                    onEditClick = {
-                        onEditLessonClick(lesson.courseId, lesson.id)
-                    },
-                    onDeleteClick = {
-                        onDeleteLessonClick(lesson)
-                    },
-                    onToggleReminder = {
-                        onToggleLessonReminder(lesson, !lesson.reminderEnabled)
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LessonCard(
-    lesson: LessonUi,
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onToggleReminder: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = lesson.dayLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Text(
-                        text = "${lesson.startTime} - ${lesson.endTime}",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-
-                Row {
-                    IconButton(onClick = onEditClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Edit,
-                            contentDescription = "Modifica lezione"
-                        )
-                    }
-                    IconButton(onClick = onToggleReminder) {
-                        Icon(
-                            imageVector = if (lesson.reminderEnabled) {
-                                Icons.Filled.NotificationsOff
-                            } else {
-                                Icons.Filled.Notifications
-                            },
-                            contentDescription = if (lesson.reminderEnabled) {
-                                "Disattiva promemoria lezione"
-                            } else {
-                                "Attiva promemoria lezione"
-                            }
-                        )
-                    }
-                    IconButton(onClick = onDeleteClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Elimina lezione"
-                        )
-                    }
-                }
-            }
-
-            lesson.classroom?.takeIf { it.isNotBlank() }?.let { classroom ->
-                DetailRow(label = "Aula", value = classroom)
-            }
-            lesson.building?.takeIf { it.isNotBlank() }?.let { building ->
-                DetailRow(label = "Edificio", value = building)
-            }
-            lesson.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                DetailRow(label = "Note", value = notes)
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
                 Icon(
-                    imageVector = if (lesson.reminderEnabled) {
-                        Icons.Filled.Notifications
-                    } else {
-                        Icons.Filled.NotificationsOff
-                    },
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = if (lesson.reminderEnabled) {
-                        "Promemoria attivo"
-                    } else {
-                        "Promemoria disattivato"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null
                 )
             }
         }
@@ -581,10 +359,6 @@ private fun ExamInfoCard(
                 style = MaterialTheme.typography.titleLarge
             )
             DetailRow(label = "Data", value = formatExamDate(course.examDate))
-            DetailRow(
-                label = "Aula",
-                value = course.classroom?.takeIf { it.isNotBlank() } ?: "Aula non impostata"
-            )
             ReminderRow(
                 course = course,
                 onToggleReminder = onToggleReminder
@@ -677,19 +451,6 @@ private fun ExternalActionsCard(
                 Icon(imageVector = Icons.Filled.CalendarMonth, contentDescription = null)
                 Spacer(modifier = Modifier.padding(horizontal = 4.dp))
                 Text(text = "Aggiungi al calendario")
-            }
-
-            OutlinedButton(
-                onClick = {
-                    ExternalIntentUtils.openCourseLocationInMaps(context, course.classroom)
-                        .messageOrNull()
-                        ?.let(onExternalActionMessage)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(imageVector = Icons.Filled.Map, contentDescription = null)
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Text(text = "Apri su Maps")
             }
 
             OutlinedButton(

@@ -42,7 +42,6 @@ data class HomeSummaryUiState(
 data class NextExamUi(
     val courseName: String,
     val examDate: String,
-    val classroom: String,
     val status: String
 )
 
@@ -130,7 +129,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 NextExamUi(
                     courseName = course.name,
                     examDate = formatDate(course.examDate),
-                    classroom = course.classroom?.takeIf { it.isNotBlank() } ?: "Aula non impostata",
                     status = statusLabel(course.status)
                 )
             },

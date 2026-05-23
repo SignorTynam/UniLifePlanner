@@ -8,6 +8,7 @@ data class LessonUiState(
     val endTime: String = "",
     val classroom: String = "",
     val building: String = "",
+    val locationQuery: String = "",
     val notes: String = "",
     val reminderEnabled: Boolean = true,
     val isLoading: Boolean = false,

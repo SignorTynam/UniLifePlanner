@@ -102,7 +102,6 @@ fun AddEditCourseScreen(
         onNameChange = viewModel::updateName,
         onProfessorChange = viewModel::updateProfessor,
         onExamDateChange = viewModel::updateExamDate,
-        onClassroomChange = viewModel::updateClassroom,
         onCreditsChange = viewModel::updateCredits,
         onStatusChange = viewModel::updateStatus,
         onNotesChange = viewModel::updateNotes,
@@ -132,7 +131,6 @@ private fun AddEditCourseContent(
     onNameChange: (String) -> Unit,
     onProfessorChange: (String) -> Unit,
     onExamDateChange: (Long?) -> Unit,
-    onClassroomChange: (String) -> Unit,
     onCreditsChange: (String) -> Unit,
     onStatusChange: (CourseStatus) -> Unit,
     onNotesChange: (String) -> Unit,
@@ -223,15 +221,6 @@ private fun AddEditCourseContent(
                     }
                 }
             }
-
-            OutlinedTextField(
-                value = uiState.classroom,
-                onValueChange = onClassroomChange,
-                label = { Text(text = "Aula") },
-                placeholder = { Text(text = "Aula 3.1") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
 
             OutlinedTextField(
                 value = uiState.credits,

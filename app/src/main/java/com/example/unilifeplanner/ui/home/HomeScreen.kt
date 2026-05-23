@@ -254,10 +254,6 @@ fun NextExamCard(
                     text = "Data: ${nextExam.examDate}",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Text(
-                    text = "Aula: ${nextExam.classroom}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
                 Spacer(modifier = Modifier.height(12.dp))
                 FilledTonalButton(onClick = {}) {
                     Text(text = nextExam.status)
@@ -294,7 +290,7 @@ fun NextLessonCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Aggiungi le lezioni dal dettaglio di un corso.",
+                    text = "Aggiungi le lezioni dalla schermata Lezioni.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -424,7 +420,6 @@ private fun HomeScreenPreview() {
                 nextExam = NextExamUi(
                     courseName = "Algoritmi e strutture dati",
                     examDate = "24 giugno 2026",
-                    classroom = "Aula B2",
                     status = "Da preparare"
                 ),
                 nextLesson = NextLessonUi(

@@ -11,7 +11,6 @@ data class CourseEntity(
     val name: String,
     val professor: String,
     val examDate: Long? = null,
-    val classroom: String? = null,
     val credits: Int,
     val status: String = CourseStatus.TO_STUDY.name,
     val isFavorite: Boolean = false,

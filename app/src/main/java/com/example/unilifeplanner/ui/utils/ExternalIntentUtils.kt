@@ -25,7 +25,6 @@ object ExternalIntentUtils {
             data = CalendarContract.Events.CONTENT_URI
             putExtra(CalendarContract.Events.TITLE, "Esame: ${course.name}")
             putExtra(CalendarContract.Events.DESCRIPTION, buildCourseDescription(course))
-            putExtra(CalendarContract.Events.EVENT_LOCATION, course.classroom.orEmpty())
             putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginTime)
             putExtra(CalendarContract.EXTRA_EVENT_END_TIME, beginTime + EXAM_DURATION_MILLIS)
         }
@@ -37,14 +36,23 @@ object ExternalIntentUtils {
         )
     }
 
-    fun openCourseLocationInMaps(
+    fun openLessonLocationInMaps(
         context: Context,
-        classroom: String?
+        courseName: String,
+        classroom: String?,
+        building: String?,
+        locationQuery: String?
     ): ExternalIntentResult {
-        val query = classroom?.trim()?.takeIf { it.isNotEmpty() }
-            ?: return ExternalIntentResult.MissingData("Aula non disponibile")
-        val encodedQuery = Uri.encode("$query universita")
-        val uri = Uri.parse("geo:0,0?q=$encodedQuery")
+        val query = locationQuery?.trim()?.takeIf { it.isNotEmpty() }
+            ?: listOfNotNull(
+                building?.trim()?.takeIf { it.isNotEmpty() },
+                classroom?.trim()?.takeIf { it.isNotEmpty() },
+                courseName.trim().takeIf { it.isNotEmpty() }
+            )
+                .joinToString(" ")
+                .takeIf { it.isNotBlank() }
+            ?: return ExternalIntentResult.MissingData("Nessun luogo disponibile per questa lezione")
+        val uri = Uri.parse("geo:0,0?q=${Uri.encode(query)}")
 
         val googleMapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
             setPackage("com.google.android.apps.maps")
@@ -53,12 +61,22 @@ object ExternalIntentUtils {
 
         return when {
             googleMapsIntent.resolveActivity(context.packageManager) != null ->
-                startActivitySafely(context, googleMapsIntent, "Impossibile aprire Google Maps")
+                startActivitySafely(
+                    context,
+                    googleMapsIntent,
+                    "Nessuna app disponibile per aprire Google Maps"
+                )
 
             fallbackIntent.resolveActivity(context.packageManager) != null ->
-                startActivitySafely(context, fallbackIntent, "Nessuna app mappe disponibile")
+                startActivitySafely(
+                    context,
+                    fallbackIntent,
+                    "Nessuna app disponibile per aprire Google Maps"
+                )
 
-            else -> ExternalIntentResult.NoCompatibleApp("Nessuna app mappe disponibile")
+            else -> ExternalIntentResult.NoCompatibleApp(
+                "Nessuna app disponibile per aprire Google Maps"
+            )
         }
     }
 
@@ -143,7 +161,6 @@ object ExternalIntentUtils {
     private fun buildCourseDescription(course: CourseEntity): String {
         return buildString {
             appendLine("Docente: ${course.professor}")
-            appendLine("Aula: ${course.classroom?.takeIf { it.isNotBlank() } ?: "Non impostata"}")
             appendLine("CFU: ${course.credits}")
             appendLine("Stato: ${formatCourseStatus(course.status)}")
             course.notes?.takeIf { it.isNotBlank() }?.let { notes ->
@@ -158,7 +175,6 @@ object ExternalIntentUtils {
             appendLine("Corso: ${course.name}")
             appendLine("Docente: ${course.professor}")
             appendLine("Data esame: ${formatShareDate(course.examDate)}")
-            appendLine("Aula: ${course.classroom?.takeIf { it.isNotBlank() } ?: "Non impostata"}")
             appendLine("CFU: ${course.credits}")
             appendLine("Stato: ${formatCourseStatus(course.status)}")
             append("Note: ${course.notes?.takeIf { it.isNotBlank() } ?: "Nessuna nota"}")

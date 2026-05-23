@@ -1,9 +1,11 @@
 package com.example.unilifeplanner.domain.lessons
 
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private const val REMINDER_HOUR = 20
@@ -62,6 +64,71 @@ fun nextLessonDateTime(
     }
 
     return nextLesson
+}
+
+fun nextOccurrenceMillis(
+    dayOfWeek: Int,
+    startTimeMinutes: Int,
+    nowMillis: Long = System.currentTimeMillis()
+): Long {
+    val zoneId = ZoneId.systemDefault()
+    val now = Instant.ofEpochMilli(nowMillis)
+        .atZone(zoneId)
+        .toLocalDateTime()
+    val targetDay = DayOfWeek.of(dayOfWeek)
+    val startTime = LocalTime.of(startTimeMinutes / 60, startTimeMinutes % 60)
+    val daysUntil = (targetDay.value - now.dayOfWeek.value + 7) % 7
+    var occurrence = now.toLocalDate()
+        .plusDays(daysUntil.toLong())
+        .atTime(startTime)
+
+    if (occurrence.isBefore(now)) {
+        occurrence = occurrence.plusWeeks(1)
+    }
+
+    return occurrence.atZone(zoneId).toInstant().toEpochMilli()
+}
+
+fun isAlreadyPassedThisWeek(
+    dayOfWeek: Int,
+    startTimeMinutes: Int,
+    nowMillis: Long = System.currentTimeMillis()
+): Boolean {
+    val zoneId = ZoneId.systemDefault()
+    val now = Instant.ofEpochMilli(nowMillis)
+        .atZone(zoneId)
+        .toLocalDateTime()
+    val nowDay = now.dayOfWeek.value
+
+    return when {
+        dayOfWeek < nowDay -> true
+        dayOfWeek > nowDay -> false
+        else -> {
+            val nowMinutes = now.hour * 60 + now.minute
+            startTimeMinutes < nowMinutes
+        }
+    }
+}
+
+fun relativeLessonLabel(
+    occurrenceMillis: Long,
+    nowMillis: Long = System.currentTimeMillis()
+): String {
+    val zoneId = ZoneId.systemDefault()
+    val occurrenceDate = Instant.ofEpochMilli(occurrenceMillis)
+        .atZone(zoneId)
+        .toLocalDate()
+    val nowDate = Instant.ofEpochMilli(nowMillis)
+        .atZone(zoneId)
+        .toLocalDate()
+    val daysDifference = ChronoUnit.DAYS.between(nowDate, occurrenceDate)
+
+    return when (daysDifference) {
+        0L -> "Oggi"
+        1L -> "Domani"
+        7L -> "${dayOfWeekLabel(occurrenceDate.dayOfWeek.value)} prossimo"
+        else -> dayOfWeekLabel(occurrenceDate.dayOfWeek.value)
+    }
 }
 
 fun nextLessonReminderAtMillis(

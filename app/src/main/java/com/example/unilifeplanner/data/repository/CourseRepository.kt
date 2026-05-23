@@ -30,7 +30,6 @@ class CourseRepository(
                 id = 0,
                 name = course.name.trim(),
                 professor = course.professor.trim(),
-                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
                 notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
                 createdAt = now,
                 updatedAt = now
@@ -42,7 +41,6 @@ class CourseRepository(
         name: String,
         professor: String,
         examDate: Long?,
-        classroom: String?,
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = false,
@@ -55,7 +53,6 @@ class CourseRepository(
                 name = name.trim(),
                 professor = professor.trim(),
                 examDate = examDate,
-                classroom = classroom?.trim()?.takeIf { it.isNotEmpty() },
                 credits = credits,
                 status = status.name,
                 isFavorite = isFavorite,
@@ -72,7 +69,6 @@ class CourseRepository(
         name: String,
         professor: String,
         examDate: Long?,
-        classroom: String?,
         credits: Int,
         status: CourseStatus,
         isFavorite: Boolean = course.isFavorite,
@@ -84,7 +80,6 @@ class CourseRepository(
                 name = name.trim(),
                 professor = professor.trim(),
                 examDate = examDate,
-                classroom = classroom?.trim()?.takeIf { it.isNotEmpty() },
                 credits = credits,
                 status = status.name,
                 isFavorite = isFavorite,
@@ -100,7 +95,6 @@ class CourseRepository(
             course.copy(
                 name = course.name.trim(),
                 professor = course.professor.trim(),
-                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
                 notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
                 updatedAt = System.currentTimeMillis()
             )

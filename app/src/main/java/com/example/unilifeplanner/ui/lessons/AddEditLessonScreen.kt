@@ -109,6 +109,7 @@ fun AddEditLessonScreen(
         onEndTimeChange = viewModel::updateEndTime,
         onClassroomChange = viewModel::updateClassroom,
         onBuildingChange = viewModel::updateBuilding,
+        onLocationQueryChange = viewModel::updateLocationQuery,
         onNotesChange = viewModel::updateNotes,
         onReminderEnabledChange = { enabled ->
             if (!enabled) {
@@ -142,6 +143,7 @@ private fun AddEditLessonContent(
     onEndTimeChange: (String) -> Unit,
     onClassroomChange: (String) -> Unit,
     onBuildingChange: (String) -> Unit,
+    onLocationQueryChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
     onReminderEnabledChange: (Boolean) -> Unit,
     onSaveClick: () -> Unit,
@@ -231,6 +233,16 @@ private fun AddEditLessonContent(
                 onValueChange = onBuildingChange,
                 label = { Text(text = "Edificio") },
                 placeholder = { Text(text = "Polo Fibonacci") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = uiState.locationQuery,
+                onValueChange = onLocationQueryChange,
+                label = { Text(text = "Luogo Google Maps") },
+                placeholder = { Text(text = "Polo Fibonacci Pisa, Aula B2") },
+                supportingText = { Text(text = "Usato per aprire la posizione in Google Maps.") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )

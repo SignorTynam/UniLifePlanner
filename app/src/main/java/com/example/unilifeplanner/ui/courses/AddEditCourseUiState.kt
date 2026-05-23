@@ -7,7 +7,6 @@ data class AddEditCourseUiState(
     val name: String = "",
     val professor: String = "",
     val examDate: Long? = null,
-    val classroom: String = "",
     val credits: String = "",
     val status: CourseStatus = CourseStatus.TO_STUDY,
     val reminderEnabled: Boolean = false,

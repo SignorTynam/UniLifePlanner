@@ -10,6 +10,13 @@ sealed class Screen(val route: String) {
     data object Map : Screen("map")
     data object Statistics : Screen("statistics")
 
+    data object Lessons : Screen("lessons?courseId={courseId}") {
+        const val ARG_COURSE_ID = "courseId"
+
+        fun createRoute(courseId: Int? = null): String =
+            courseId?.let { "lessons?courseId=$it" } ?: "lessons"
+    }
+
     data object CourseDetail : Screen("course_detail/{courseId}") {
         const val ARG_COURSE_ID = "courseId"
 
