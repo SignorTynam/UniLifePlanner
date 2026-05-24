@@ -104,6 +104,7 @@ fun AddEditLessonScreen(
     AddEditLessonContent(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
+        onDateChange = viewModel::updateDate,
         onDayOfWeekChange = viewModel::updateDayOfWeek,
         onStartTimeChange = viewModel::updateStartTime,
         onEndTimeChange = viewModel::updateEndTime,
@@ -138,6 +139,7 @@ fun AddEditLessonScreen(
 private fun AddEditLessonContent(
     uiState: LessonUiState,
     snackbarHostState: SnackbarHostState,
+    onDateChange: (String) -> Unit,
     onDayOfWeekChange: (Int) -> Unit,
     onStartTimeChange: (String) -> Unit,
     onEndTimeChange: (String) -> Unit,
@@ -185,10 +187,22 @@ private fun AddEditLessonContent(
                 .padding(PaddingValues(16.dp)),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            DayOfWeekSelector(
-                selectedDayOfWeek = uiState.dayOfWeek,
-                error = uiState.dayOfWeekError,
-                onDayOfWeekChange = onDayOfWeekChange
+            OutlinedTextField(
+                value = uiState.date,
+                onValueChange = onDateChange,
+                label = { Text(text = "Data") },
+                placeholder = { Text(text = "24/05/2026") },
+                isError = uiState.dateError != null,
+                supportingText = {
+                    Text(
+                        text = uiState.dateError
+                            ?: uiState.dayOfWeek?.let { "Giorno: ${dayOfWeekLabel(it)}" }
+                            ?: "Formato gg/mm/aaaa"
+                    )
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(

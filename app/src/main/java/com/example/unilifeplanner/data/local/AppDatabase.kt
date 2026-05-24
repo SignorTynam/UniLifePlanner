@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.unilifeplanner.domain.lessons.nextLessonDateMillis
 
 @Database(
     entities = [
         CourseEntity::class,
         LessonEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,7 +36,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4,
                         MIGRATION_4_5,
-                        MIGRATION_5_6
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
                     )
                     .build()
 
@@ -180,6 +182,50 @@ abstract class AppDatabase : RoomDatabase() {
                     ON lessons(sourceProvider, externalId)
                     """.trimIndent()
                 )
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.addColumnIfMissing("lessons", "dateMillis", "dateMillis INTEGER")
+                backfillLessonDates(db)
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS index_lessons_dateMillis
+                    ON lessons(dateMillis)
+                    """.trimIndent()
+                )
+            }
+        }
+
+        private fun backfillLessonDates(db: SupportSQLiteDatabase) {
+            val nowMillis = System.currentTimeMillis()
+            db.query(
+                """
+                SELECT id, dayOfWeek, startTimeMinutes
+                FROM lessons
+                WHERE dateMillis IS NULL
+                """.trimIndent()
+            ).use { cursor ->
+                val idIndex = cursor.getColumnIndex("id")
+                val dayOfWeekIndex = cursor.getColumnIndex("dayOfWeek")
+                val startTimeIndex = cursor.getColumnIndex("startTimeMinutes")
+                while (cursor.moveToNext()) {
+                    val lessonId = cursor.getInt(idIndex)
+                    val dayOfWeek = cursor.getInt(dayOfWeekIndex)
+                    val startTimeMinutes = cursor.getInt(startTimeIndex)
+                    if (dayOfWeek !in 1..7 || startTimeMinutes !in 0..1439) continue
+
+                    val dateMillis = nextLessonDateMillis(
+                        dayOfWeek = dayOfWeek,
+                        startTimeMinutes = startTimeMinutes,
+                        nowMillis = nowMillis
+                    )
+                    db.execSQL(
+                        "UPDATE lessons SET dateMillis = ? WHERE id = ?",
+                        arrayOf(dateMillis, lessonId)
+                    )
+                }
             }
         }
 

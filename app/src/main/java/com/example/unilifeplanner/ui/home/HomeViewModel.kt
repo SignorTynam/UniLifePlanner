@@ -12,7 +12,7 @@ import com.example.unilifeplanner.data.repository.LessonRepository
 import com.example.unilifeplanner.data.repository.UserProfileRepository
 import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
-import com.example.unilifeplanner.domain.lessons.nextLessonDateTime
+import com.example.unilifeplanner.domain.lessons.lessonStartDateTime
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.domain.model.UserProfile
 import java.time.Instant
@@ -99,11 +99,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .asSequence()
             .mapNotNull { lesson ->
                 val course = coursesById[lesson.courseId] ?: return@mapNotNull null
-                val nextDateTime = nextLessonDateTime(
+                val nextDateTime = lessonStartDateTime(
+                    dateMillis = lesson.dateMillis,
                     dayOfWeek = lesson.dayOfWeek,
                     startTimeMinutes = lesson.startTimeMinutes,
-                    now = nowDateTime
+                    nowMillis = now
                 )
+                if (!nextDateTime.isAfter(nowDateTime)) return@mapNotNull null
                 NextLessonCandidate(
                     dateTime = nextDateTime,
                     ui = NextLessonUi(

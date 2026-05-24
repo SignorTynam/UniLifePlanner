@@ -18,11 +18,13 @@ class LessonReminderScheduler(
         lessonId: Int,
         courseId: Int,
         courseName: String,
+        dateMillis: Long?,
         dayOfWeek: Int,
         startTimeMinutes: Int,
         classroom: String?
     ) {
         val triggerAtMillis = nextLessonReminderAtMillis(
+            dateMillis = dateMillis,
             dayOfWeek = dayOfWeek,
             startTimeMinutes = startTimeMinutes
         )
@@ -39,6 +41,7 @@ class LessonReminderScheduler(
                     LessonReminderWorker.KEY_LESSON_ID to lessonId,
                     LessonReminderWorker.KEY_COURSE_ID to courseId,
                     LessonReminderWorker.KEY_COURSE_NAME to courseName,
+                    LessonReminderWorker.KEY_DATE_MILLIS to (dateMillis ?: -1L),
                     LessonReminderWorker.KEY_DAY_OF_WEEK to dayOfWeek,
                     LessonReminderWorker.KEY_START_TIME_MINUTES to startTimeMinutes,
                     LessonReminderWorker.KEY_CLASSROOM to classroom
@@ -61,6 +64,7 @@ class LessonReminderScheduler(
         lessonId: Int,
         courseId: Int,
         courseName: String,
+        dateMillis: Long?,
         dayOfWeek: Int,
         startTimeMinutes: Int,
         classroom: String?
@@ -70,6 +74,7 @@ class LessonReminderScheduler(
             lessonId = lessonId,
             courseId = courseId,
             courseName = courseName,
+            dateMillis = dateMillis,
             dayOfWeek = dayOfWeek,
             startTimeMinutes = startTimeMinutes,
             classroom = classroom

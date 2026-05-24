@@ -48,6 +48,7 @@ class LessonReminderWorker(
                 lessonId = lesson.id,
                 courseId = lesson.courseId,
                 courseName = course.name,
+                dateMillis = lesson.dateMillis,
                 dayOfWeek = lesson.dayOfWeek,
                 startTimeMinutes = lesson.startTimeMinutes,
                 classroom = lesson.classroom
@@ -61,6 +62,7 @@ class LessonReminderWorker(
         const val KEY_LESSON_ID = "lesson_id"
         const val KEY_COURSE_ID = "course_id"
         const val KEY_COURSE_NAME = "course_name"
+        const val KEY_DATE_MILLIS = "date_millis"
         const val KEY_DAY_OF_WEEK = "day_of_week"
         const val KEY_START_TIME_MINUTES = "start_time_minutes"
         const val KEY_CLASSROOM = "classroom"

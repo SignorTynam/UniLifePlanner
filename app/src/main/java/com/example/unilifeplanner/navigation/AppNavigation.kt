@@ -109,7 +109,6 @@ fun AppNavigation(
         onNavigateCourses = { navigateToTopLevel(Screen.Courses.route) },
         onNavigateLessons = { navigateToTopLevel(Screen.Lessons.createRoute()) },
         onNavigateStatistics = { navigateToTopLevel(Screen.Statistics.route) },
-        onNavigateUniversity = { navigateToTopLevel(Screen.University.route) },
         onNavigatePublicUniboImport = { navigateToTopLevel(Screen.PublicUniboImport.route) },
         onNavigateMap = { navigateToTopLevel(Screen.Map.route) },
         onNavigateProfile = { navigateToTopLevel(Screen.Profile.route) },

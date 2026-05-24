@@ -18,6 +18,10 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["courseId"]),
         Index(
+            value = ["dateMillis"],
+            name = "index_lessons_dateMillis"
+        ),
+        Index(
             value = ["sourceProvider", "externalId"],
             name = "index_lessons_sourceProvider_externalId"
         )
@@ -27,6 +31,7 @@ data class LessonEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val courseId: Int,
+    val dateMillis: Long? = null,
     val dayOfWeek: Int,
     val startTimeMinutes: Int,
     val endTimeMinutes: Int,

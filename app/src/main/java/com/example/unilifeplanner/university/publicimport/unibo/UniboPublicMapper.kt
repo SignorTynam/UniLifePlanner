@@ -2,6 +2,7 @@ package com.example.unilifeplanner.university.publicimport.unibo
 
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.data.local.LessonEntity
+import com.example.unilifeplanner.domain.lessons.nextLessonDateMillis
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.university.publicimport.PublicLesson
 import com.example.unilifeplanner.university.publicimport.PublicTeaching
@@ -42,6 +43,11 @@ class UniboPublicMapper {
 
         return LessonEntity(
             courseId = courseId,
+            dateMillis = lesson.dateMillis ?: nextLessonDateMillis(
+                dayOfWeek = dayOfWeek,
+                startTimeMinutes = startTimeMinutes,
+                nowMillis = nowMillis
+            ),
             dayOfWeek = dayOfWeek,
             startTimeMinutes = startTimeMinutes,
             endTimeMinutes = endTimeMinutes,

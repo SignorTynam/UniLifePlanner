@@ -3,6 +3,7 @@ package com.example.unilifeplanner.ui.lessons
 data class LessonUiState(
     val courseId: Int = 0,
     val lessonId: Int? = null,
+    val date: String = "",
     val dayOfWeek: Int? = null,
     val startTime: String = "",
     val endTime: String = "",
@@ -14,6 +15,7 @@ data class LessonUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
+    val dateError: String? = null,
     val dayOfWeekError: String? = null,
     val startTimeError: String? = null,
     val endTimeError: String? = null,

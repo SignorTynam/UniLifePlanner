@@ -9,6 +9,10 @@ import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
+import com.example.unilifeplanner.domain.lessons.formatLessonDate
+import com.example.unilifeplanner.domain.lessons.localDateToStartOfDayMillis
+import com.example.unilifeplanner.domain.lessons.nextLessonDateMillis
+import com.example.unilifeplanner.domain.lessons.parseLessonDate
 import com.example.unilifeplanner.domain.lessons.parseTimeToMinutes
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,9 +84,14 @@ class AddEditLessonViewModel(
                 }
 
                 selectedLesson = lesson
+                val displayedDateMillis = lesson.dateMillis ?: nextLessonDateMillis(
+                    dayOfWeek = lesson.dayOfWeek,
+                    startTimeMinutes = lesson.startTimeMinutes
+                )
                 _uiState.value = LessonUiState(
                     courseId = courseId,
                     lessonId = lesson.id,
+                    date = formatLessonDate(displayedDateMillis),
                     dayOfWeek = lesson.dayOfWeek,
                     startTime = formatMinutesToTime(lesson.startTimeMinutes),
                     endTime = formatMinutesToTime(lesson.endTimeMinutes),
@@ -101,6 +110,20 @@ class AddEditLessonViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun updateDate(value: String) {
+        val parsedDate = parseLessonDate(value)
+        _uiState.update {
+            it.copy(
+                date = value,
+                dayOfWeek = parsedDate?.dayOfWeek?.value ?: it.dayOfWeek,
+                dateError = null,
+                dayOfWeekError = null,
+                errorMessage = null,
+                saveSuccess = false
+            )
         }
     }
 
@@ -174,10 +197,12 @@ class AddEditLessonViewModel(
 
     fun saveLesson() {
         val state = _uiState.value
+        val parsedDate = parseLessonDate(state.date)
         val startMinutes = parseTimeToMinutes(state.startTime)
         val endMinutes = parseTimeToMinutes(state.endTime)
         val validatedState = validateState(
             state = state,
+            parsedDate = parsedDate,
             startMinutes = startMinutes,
             endMinutes = endMinutes
         )
@@ -186,6 +211,7 @@ class AddEditLessonViewModel(
             _uiState.value = validatedState
             return
         }
+        val lessonDate = requireNotNull(parsedDate)
 
         viewModelScope.launch {
             _uiState.update {
@@ -208,7 +234,8 @@ class AddEditLessonViewModel(
                 val lesson = LessonEntity(
                     id = state.lessonId ?: 0,
                     courseId = state.courseId,
-                    dayOfWeek = requireNotNull(state.dayOfWeek),
+                    dateMillis = localDateToStartOfDayMillis(lessonDate),
+                    dayOfWeek = lessonDate.dayOfWeek.value,
                     startTimeMinutes = requireNotNull(startMinutes),
                     endTimeMinutes = requireNotNull(endMinutes),
                     classroom = state.classroom,
@@ -251,7 +278,8 @@ class AddEditLessonViewModel(
                         lessonId = savedLessonId,
                         courseId = state.courseId,
                         courseName = course.name,
-                        dayOfWeek = requireNotNull(state.dayOfWeek),
+                        dateMillis = localDateToStartOfDayMillis(lessonDate),
+                        dayOfWeek = lessonDate.dayOfWeek.value,
                         startTimeMinutes = requireNotNull(startMinutes),
                         classroom = state.classroom.trim().takeIf { it.isNotEmpty() }
                     )
@@ -275,11 +303,14 @@ class AddEditLessonViewModel(
 
     private fun validateState(
         state: LessonUiState,
+        parsedDate: java.time.LocalDate?,
         startMinutes: Int?,
         endMinutes: Int?
     ): LessonUiState? {
-        val dayError = if (state.dayOfWeek == null || state.dayOfWeek !in 1..7) {
-            "Seleziona un giorno della settimana"
+        val dateError = if (parsedDate == null) {
+            "Inserisci una data valida nel formato gg/mm/aaaa"
+        } else if (parsedDate.dayOfWeek.value !in 1..7) {
+            "Data non valida"
         } else {
             null
         }
@@ -295,11 +326,12 @@ class AddEditLessonViewModel(
             else -> null
         }
 
-        return if (dayError == null && startError == null && endError == null) {
+        return if (dateError == null && startError == null && endError == null) {
             null
         } else {
             state.copy(
-                dayOfWeekError = dayError,
+                dateError = dateError,
+                dayOfWeekError = null,
                 startTimeError = startError,
                 endTimeError = endError,
                 errorMessage = "Controlla i campi evidenziati",

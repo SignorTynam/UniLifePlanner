@@ -83,6 +83,7 @@ class UniboPublicImporter(
             lessonId = lesson.id,
             courseId = course.id,
             courseName = course.name,
+            dateMillis = lesson.dateMillis,
             dayOfWeek = lesson.dayOfWeek,
             startTimeMinutes = lesson.startTimeMinutes,
             classroom = lesson.classroom

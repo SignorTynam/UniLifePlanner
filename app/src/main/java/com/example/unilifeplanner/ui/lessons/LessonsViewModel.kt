@@ -10,11 +10,11 @@ import com.example.unilifeplanner.data.repository.LessonRepository
 import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.domain.lessons.isAlreadyPassedThisWeek
-import com.example.unilifeplanner.domain.lessons.nextOccurrenceMillis
-import com.example.unilifeplanner.domain.lessons.relativeLessonLabel
+import com.example.unilifeplanner.domain.lessons.lessonStartMillis
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -81,13 +81,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             .filter { matchesDateFilter(it, filters.dateFilter, nowMillis) }
 
         val lessonItems = filteredLessons.map { it.toLessonListItemUi(nowMillis) }
-        val shouldGroupPastThisWeek = filters.dateFilter == LessonDateFilter.TODAY ||
-            filters.dateFilter == LessonDateFilter.THIS_WEEK
-        val (pastThisWeek, upcoming) = if (shouldGroupPastThisWeek) {
-            lessonItems.partition { it.isPastThisWeek }
-        } else {
-            emptyList<LessonListItemUi>() to lessonItems
-        }
+        val (pastThisWeek, upcoming) = lessonItems.partition { it.isPastThisWeek }
 
         LessonsUiState(
             isLoading = isLoading,
@@ -173,6 +167,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
                         lessonId = lesson.id,
                         courseId = lesson.courseId,
                         courseName = course.name,
+                        dateMillis = lesson.dateMillis,
                         dayOfWeek = lesson.dayOfWeek,
                         startTimeMinutes = lesson.startTimeMinutes,
                         classroom = lesson.classroom
@@ -214,13 +209,24 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
         val today = Instant.ofEpochMilli(nowMillis)
             .atZone(zoneId)
             .toLocalDate()
-        val lessonDay = lesson.lesson.dayOfWeek
+        val lessonDate = Instant.ofEpochMilli(
+            lessonStartMillis(
+                dateMillis = lesson.lesson.dateMillis,
+                dayOfWeek = lesson.lesson.dayOfWeek,
+                startTimeMinutes = lesson.lesson.startTimeMinutes,
+                nowMillis = nowMillis,
+                zoneId = zoneId
+            )
+        )
+            .atZone(zoneId)
+            .toLocalDate()
 
         return when (filter) {
             LessonDateFilter.ALL -> true
-            LessonDateFilter.TODAY -> lessonDay == today.dayOfWeek.value
-            LessonDateFilter.TOMORROW -> lessonDay == today.plusDays(1).dayOfWeek.value
-            LessonDateFilter.THIS_WEEK -> true
+            LessonDateFilter.TODAY -> lessonDate == today
+            LessonDateFilter.TOMORROW -> lessonDate == today.plusDays(1)
+            LessonDateFilter.THIS_WEEK -> !lessonDate.isBefore(today) &&
+                !lessonDate.isAfter(today.plusDays(6))
             LessonDateFilter.REMINDER_ENABLED -> lesson.lesson.reminderEnabled
         }
     }
@@ -239,19 +245,18 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun sortPastLessons(lessons: List<LessonListItemUi>): List<LessonListItemUi> {
-        return lessons.sortedWith(
-            compareByDescending<LessonListItemUi> { it.dayOfWeek }
-                .thenByDescending { it.startTime }
-        )
+        return lessons.sortedByDescending { it.nextOccurrenceMillis }
     }
 
     private fun LessonWithCourse.toLessonListItemUi(nowMillis: Long): LessonListItemUi {
-        val occurrenceMillis = nextOccurrenceMillis(
+        val occurrenceMillis = lessonStartMillis(
+            dateMillis = lesson.dateMillis,
             dayOfWeek = lesson.dayOfWeek,
             startTimeMinutes = lesson.startTimeMinutes,
             nowMillis = nowMillis
         )
         val isPastThisWeek = isAlreadyPassedThisWeek(
+            dateMillis = lesson.dateMillis,
             dayOfWeek = lesson.dayOfWeek,
             startTimeMinutes = lesson.startTimeMinutes,
             nowMillis = nowMillis
@@ -259,7 +264,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
         val relativeLabel = if (isPastThisWeek) {
             dayOfWeekLabel(lesson.dayOfWeek)
         } else {
-            relativeLessonLabel(occurrenceMillis, nowMillis)
+            relativeLessonDateLabel(occurrenceMillis, nowMillis)
         }
 
         return LessonListItemUi(
@@ -280,6 +285,27 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             nextOccurrenceMillis = occurrenceMillis,
             isPastThisWeek = isPastThisWeek
         )
+    }
+
+    private fun relativeLessonDateLabel(
+        occurrenceMillis: Long,
+        nowMillis: Long
+    ): String {
+        val zoneId = ZoneId.systemDefault()
+        val occurrenceDate = Instant.ofEpochMilli(occurrenceMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+        val today = Instant.ofEpochMilli(nowMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+
+        return when (occurrenceDate) {
+            today -> "Oggi"
+            today.plusDays(1) -> "Domani"
+            else -> "${dayOfWeekLabel(occurrenceDate.dayOfWeek.value)}, ${
+                occurrenceDate.format(DateTimeFormatter.ofPattern("dd/MM"))
+            }"
+        }
     }
 }
 

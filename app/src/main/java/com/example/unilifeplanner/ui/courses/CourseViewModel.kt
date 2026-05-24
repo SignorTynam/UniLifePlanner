@@ -589,6 +589,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         lessonId = lesson.id,
                         courseId = lesson.courseId,
                         courseName = course.name,
+                        dateMillis = lesson.dateMillis,
                         dayOfWeek = lesson.dayOfWeek,
                         startTimeMinutes = lesson.startTimeMinutes,
                         classroom = lesson.classroom

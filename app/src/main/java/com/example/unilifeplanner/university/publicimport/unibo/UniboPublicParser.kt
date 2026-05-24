@@ -242,6 +242,7 @@ class UniboPublicParser {
             lessons[externalId] = PublicLesson(
                 externalId = externalId,
                 teachingExternalId = teaching.externalId,
+                dateMillis = null,
                 dayOfWeek = day,
                 startTimeMinutes = start,
                 endTimeMinutes = end,

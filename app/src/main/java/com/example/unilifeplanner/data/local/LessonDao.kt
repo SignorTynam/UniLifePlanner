@@ -27,7 +27,7 @@ interface LessonDao {
         """
         SELECT * FROM lessons
         WHERE courseId = :courseId
-        ORDER BY dayOfWeek ASC, startTimeMinutes ASC
+        ORDER BY dateMillis IS NULL ASC, dateMillis ASC, dayOfWeek ASC, startTimeMinutes ASC
         """
     )
     fun getLessonsForCourse(courseId: Int): Flow<List<LessonEntity>>
@@ -76,7 +76,12 @@ interface LessonDao {
         }
     }
 
-    @Query("SELECT * FROM lessons ORDER BY dayOfWeek ASC, startTimeMinutes ASC")
+    @Query(
+        """
+        SELECT * FROM lessons
+        ORDER BY dateMillis IS NULL ASC, dateMillis ASC, dayOfWeek ASC, startTimeMinutes ASC
+        """
+    )
     fun getAllLessons(): Flow<List<LessonEntity>>
 
     @Query(
@@ -84,7 +89,7 @@ interface LessonDao {
         SELECT lessons.*, courses.name AS courseName, courses.professor AS courseProfessor
         FROM lessons
         INNER JOIN courses ON lessons.courseId = courses.id
-        ORDER BY lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
+        ORDER BY lessons.dateMillis IS NULL ASC, lessons.dateMillis ASC, lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
         """
     )
     fun getLessonsWithCourse(): Flow<List<LessonWithCourse>>
@@ -95,7 +100,7 @@ interface LessonDao {
         FROM lessons
         INNER JOIN courses ON lessons.courseId = courses.id
         WHERE lessons.courseId = :courseId
-        ORDER BY lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
+        ORDER BY lessons.dateMillis IS NULL ASC, lessons.dateMillis ASC, lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
         """
     )
     fun getLessonsWithCourseForCourse(courseId: Int): Flow<List<LessonWithCourse>>
