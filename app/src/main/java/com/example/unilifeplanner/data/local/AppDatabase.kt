@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CourseEntity::class,
         LessonEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,7 +30,13 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "unilife_planner_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6
+                    )
                     .build()
 
                 INSTANCE = instance
@@ -150,6 +156,48 @@ abstract class AppDatabase : RoomDatabase() {
                     ON lessons(sourceProvider, externalId)
                     """.trimIndent()
                 )
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.addColumnIfMissing("courses", "externalId", "externalId TEXT")
+                db.addColumnIfMissing("courses", "sourceProvider", "sourceProvider TEXT")
+                db.addColumnIfMissing("courses", "officialUrl", "officialUrl TEXT")
+                db.addColumnIfMissing("courses", "classroom", "classroom TEXT")
+                db.addColumnIfMissing("lessons", "externalId", "externalId TEXT")
+                db.addColumnIfMissing("lessons", "sourceProvider", "sourceProvider TEXT")
+                db.addColumnIfMissing("lessons", "officialUrl", "officialUrl TEXT")
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS index_courses_sourceProvider_externalId
+                    ON courses(sourceProvider, externalId)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS index_lessons_sourceProvider_externalId
+                    ON lessons(sourceProvider, externalId)
+                    """.trimIndent()
+                )
+            }
+        }
+
+        private fun SupportSQLiteDatabase.addColumnIfMissing(
+            tableName: String,
+            columnName: String,
+            columnDefinition: String
+        ) {
+            val exists = query("PRAGMA table_info($tableName)").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                var found = false
+                while (!found && cursor.moveToNext()) {
+                    found = cursor.getString(nameIndex) == columnName
+                }
+                found
+            }
+            if (!exists) {
+                execSQL("ALTER TABLE $tableName ADD COLUMN $columnDefinition")
             }
         }
     }
