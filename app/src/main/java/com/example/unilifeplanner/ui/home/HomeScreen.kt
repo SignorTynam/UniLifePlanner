@@ -242,7 +242,7 @@ fun NextExamCard(
             if (nextExam == null) {
                 EmptyStateCard(
                     title = "Nessun esame programmato",
-                    message = "Aggiungi un corso con una data d'esame per visualizzarlo qui."
+                    message = "Aggiungi un appello dalla schermata Esami per visualizzarlo qui."
                 )
             } else {
                 Text(

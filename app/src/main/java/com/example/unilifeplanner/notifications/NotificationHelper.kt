@@ -18,6 +18,7 @@ import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 object NotificationHelper {
     const val EXTRA_COURSE_ID = "extra_course_id"
     const val EXTRA_LESSON_ID = "extra_lesson_id"
+    const val EXTRA_EXAM_APPEAL_ID = "extra_exam_appeal_id"
     const val CHANNEL_ID_LESSON_REMINDERS = "lesson_reminders"
     const val CHANNEL_NAME_LESSON_REMINDERS = "Promemoria lezioni"
     const val CHANNEL_DESCRIPTION_LESSON_REMINDERS =
@@ -52,8 +53,10 @@ object NotificationHelper {
 
     fun showExamReminderNotification(
         context: Context,
+        examAppealId: Int,
         courseId: Int,
         courseName: String,
+        examDateText: String,
         reminderType: ExamReminderType
     ) {
         if (!hasNotificationPermission(context)) return
@@ -61,34 +64,39 @@ object NotificationHelper {
         createNotificationChannel(context)
 
         val message = when (reminderType) {
-            ExamReminderType.DAY_BEFORE -> "Domani hai l'esame di $courseName"
-            ExamReminderType.SAME_DAY -> "Oggi hai l'esame di $courseName"
+            ExamReminderType.DAY_BEFORE -> "Domani hai l'appello di $courseName"
+            ExamReminderType.SAME_DAY -> "Oggi hai l'appello di $courseName"
+            ExamReminderType.CUSTOM -> "Promemoria appello per $courseName"
         }
+        val expandedMessage = listOf(message, examDateText.takeIf { it.isNotBlank() })
+            .filterNotNull()
+            .joinToString("\n")
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(EXTRA_COURSE_ID, courseId)
+            putExtra(EXTRA_EXAM_APPEAL_ID, examAppealId)
         }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            notificationId(courseId, reminderType),
+            examNotificationId(examAppealId, reminderType),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Promemoria esame")
+            .setContentTitle("Promemoria appello")
             .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(expandedMessage))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
         NotificationManagerCompat.from(context).notify(
-            notificationId(courseId, reminderType),
+            examNotificationId(examAppealId, reminderType),
             notification
         )
     }
@@ -150,16 +158,17 @@ object NotificationHelper {
             ) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun notificationId(
-        courseId: Int,
+    private fun examNotificationId(
+        examAppealId: Int,
         reminderType: ExamReminderType
     ): Int {
         val suffix = when (reminderType) {
             ExamReminderType.DAY_BEFORE -> 1
             ExamReminderType.SAME_DAY -> 2
+            ExamReminderType.CUSTOM -> 3
         }
 
-        return courseId * 10 + suffix
+        return 400_000 + examAppealId * 10 + suffix
     }
 
     private fun lessonNotificationId(lessonId: Int): Int = 300_000 + lessonId

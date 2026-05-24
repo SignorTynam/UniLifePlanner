@@ -5,6 +5,13 @@ sealed class Screen(val route: String) {
     data object Register : Screen("register")
     data object Home : Screen("home")
     data object Courses : Screen("courses")
+    data object Exams : Screen("exams?courseId={courseId}") {
+        const val ARG_COURSE_ID = "courseId"
+
+        fun createRoute(courseId: Int? = null): String =
+            courseId?.let { "exams?courseId=$it" } ?: "exams"
+    }
+
     data object Profile : Screen("profile")
     data object Settings : Screen("settings")
     data object Map : Screen("map")
@@ -41,5 +48,25 @@ sealed class Screen(val route: String) {
 
         fun createRoute(courseId: Int, lessonId: Int? = null): String =
             lessonId?.let { "add_edit_lesson/$courseId/$it" } ?: "add_edit_lesson/$courseId"
+    }
+
+    data object AddEditExam : Screen("add_edit_exam?courseId={courseId}&examAppealId={examAppealId}") {
+        const val ARG_COURSE_ID = "courseId"
+        const val ARG_EXAM_APPEAL_ID = "examAppealId"
+
+        fun createRoute(
+            courseId: Int? = null,
+            examAppealId: Int? = null
+        ): String {
+            val query = buildList {
+                courseId?.let { add("courseId=$it") }
+                examAppealId?.let { add("examAppealId=$it") }
+            }.joinToString("&")
+            return if (query.isBlank()) {
+                "add_edit_exam"
+            } else {
+                "add_edit_exam?$query"
+            }
+        }
     }
 }

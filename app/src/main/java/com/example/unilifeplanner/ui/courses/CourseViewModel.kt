@@ -280,25 +280,16 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
             try {
                 val existingCourse = _selectedCourse.value
-                val shouldEnableReminder =
-                    state.reminderEnabled && isValidFutureExamDate(state.examDate)
                 if (state.courseId == null) {
-                    val newCourseId = repository.insertCourse(
+                    repository.insertCourse(
                         name = state.name,
                         professor = state.professor,
-                        examDate = state.examDate,
+                        examDate = null,
                         credits = requireNotNull(creditsValue),
                         status = state.status,
-                        reminderEnabled = shouldEnableReminder,
+                        reminderEnabled = false,
                         notes = state.notes
                     )
-                    if (shouldEnableReminder) {
-                        reminderScheduler.scheduleExamReminders(
-                            courseId = newCourseId.toInt(),
-                            courseName = state.name.trim(),
-                            examDate = requireNotNull(state.examDate)
-                        )
-                    }
                 } else {
                     if (existingCourse == null) {
                         _addEditUiState.update {
@@ -310,32 +301,20 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         return@launch
                     }
 
-                    val shouldCancelOldReminder =
-                        existingCourse.reminderEnabled ||
-                            existingCourse.examDate != state.examDate ||
-                            !shouldEnableReminder
+                    if (existingCourse.reminderEnabled) {
+                        reminderScheduler.cancelLegacyCourseExamReminders(existingCourse.id)
+                    }
 
                     repository.updateCourse(
                         course = existingCourse,
                         name = state.name,
                         professor = state.professor,
-                        examDate = state.examDate,
+                        examDate = existingCourse.examDate,
                         credits = requireNotNull(creditsValue),
                         status = state.status,
-                        reminderEnabled = shouldEnableReminder,
+                        reminderEnabled = false,
                         notes = state.notes
                     )
-
-                    if (shouldCancelOldReminder) {
-                        reminderScheduler.cancelExamReminders(existingCourse.id)
-                    }
-                    if (shouldEnableReminder) {
-                        reminderScheduler.scheduleExamReminders(
-                            courseId = existingCourse.id,
-                            courseName = state.name.trim(),
-                            examDate = requireNotNull(state.examDate)
-                        )
-                    }
                 }
 
                 _addEditUiState.update {
@@ -454,7 +433,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             try {
                 _courseDetailUiState.update { it.copy(isLoading = true, errorMessage = null) }
-                reminderScheduler.cancelExamReminders(course.id)
+                reminderScheduler.cancelLegacyCourseExamReminders(course.id)
                 lessonRepository.getLessonsForCourse(course.id).first()
                     .forEach { lesson ->
                         lessonReminderScheduler.cancelLessonReminder(lesson.id)
@@ -476,7 +455,7 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteCourseById(courseId: Int) {
         viewModelScope.launch {
             runDatabaseOperation {
-                reminderScheduler.cancelExamReminders(courseId)
+                reminderScheduler.cancelLegacyCourseExamReminders(courseId)
                 lessonRepository.getLessonsForCourse(courseId).first()
                     .forEach { lesson ->
                         lessonReminderScheduler.cancelLessonReminder(lesson.id)
@@ -527,14 +506,11 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     enabled = nextValue
                 )
 
+                reminderScheduler.cancelLegacyCourseExamReminders(course.id)
                 if (nextValue) {
-                    reminderScheduler.scheduleExamReminders(
-                        courseId = course.id,
-                        courseName = course.name,
-                        examDate = requireNotNull(course.examDate)
-                    )
-                } else {
-                    reminderScheduler.cancelExamReminders(course.id)
+                    val message = "I promemoria esame si gestiscono dai singoli appelli."
+                    _errorMessage.value = message
+                    _courseDetailUiState.update { it.copy(errorMessage = message) }
                 }
             } catch (exception: Exception) {
                 val message = exception.message ?: "Aggiornamento promemoria non riuscito"
@@ -668,9 +644,8 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
         return when (sortOption) {
             CourseSortOption.DEFAULT -> filteredCourses
-            CourseSortOption.EXAM_DATE_ASC -> filteredCourses.sortedWith(
-                compareBy<CourseEntity> { it.examDate == null }
-                    .thenBy { it.examDate ?: Long.MAX_VALUE }
+            CourseSortOption.CREDITS_DESC -> filteredCourses.sortedWith(
+                compareByDescending<CourseEntity> { it.credits }
                     .thenBy { it.name.lowercase() }
             )
 

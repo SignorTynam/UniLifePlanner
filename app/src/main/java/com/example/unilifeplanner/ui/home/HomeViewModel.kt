@@ -6,19 +6,21 @@ import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.datastore.UserProfileDataStore
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.data.local.ExamAppealWithCourse
 import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
 import com.example.unilifeplanner.data.repository.UserProfileRepository
+import com.example.unilifeplanner.domain.exams.examStartMillis
+import com.example.unilifeplanner.domain.exams.formatExamDateTime
 import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.domain.lessons.lessonStartDateTime
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.domain.model.UserProfile
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -61,6 +63,7 @@ data class FavoriteCourseUi(
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val courseRepository = CourseRepository(database.courseDao())
+    private val examAppealRepository = ExamAppealRepository(database.examAppealDao())
     private val lessonRepository = LessonRepository(database.lessonDao())
     private val userProfileRepository = UserProfileRepository(
         userProfileDataStore = UserProfileDataStore(application.applicationContext)
@@ -69,13 +72,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<HomeSummaryUiState> = combine(
         courseRepository.allCourses,
         lessonRepository.getAllLessons(),
+        examAppealRepository.getExamAppealsWithCourse(),
         userProfileRepository.getProfile()
-    ) { courses, lessons, profile ->
+    ) { courses, lessons, exams, profile ->
         courses.toHomeSummaryUiState(
             profile = profile,
-            lessons = lessons
+            lessons = lessons,
+            exams = exams
         )
-        }
+    }
         .catch {
             emit(HomeSummaryUiState())
         }
@@ -87,12 +92,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun List<CourseEntity>.toHomeSummaryUiState(
         profile: UserProfile,
-        lessons: List<LessonEntity>
+        lessons: List<LessonEntity>,
+        exams: List<ExamAppealWithCourse>
     ): HomeSummaryUiState {
         val now = System.currentTimeMillis()
-        val nextExam = asSequence()
-            .filter { it.examDate != null && it.examDate >= now }
-            .minByOrNull { it.examDate ?: Long.MAX_VALUE }
+        val nextExam = exams
+            .asSequence()
+            .map { exam ->
+                exam to examStartMillis(
+                    dateMillis = exam.exam.dateMillis,
+                    timeMinutes = exam.exam.timeMinutes
+                )
+            }
+            .filter { (_, startMillis) -> startMillis >= now }
+            .minByOrNull { (_, startMillis) -> startMillis }
         val coursesById = associateBy { it.id }
         val nowDateTime = LocalDateTime.now()
         val nextLesson = lessons
@@ -127,11 +140,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             completedCourses = count { it.status == CourseStatus.COMPLETED.name },
             inProgressCourses = count { it.status == CourseStatus.IN_PROGRESS.name },
             toStudyCourses = count { it.status == CourseStatus.TO_STUDY.name },
-            nextExam = nextExam?.let { course ->
+            nextExam = nextExam?.let { (exam, _) ->
                 NextExamUi(
-                    courseName = course.name,
-                    examDate = formatDate(course.examDate),
-                    status = statusLabel(course.status)
+                    courseName = exam.courseName,
+                    examDate = formatExamDateTime(
+                        dateMillis = exam.exam.dateMillis,
+                        timeMinutes = exam.exam.timeMinutes
+                    ),
+                    status = if (exam.exam.reminderEnabled) {
+                        "Promemoria attivo"
+                    } else {
+                        "Promemoria disattivato"
+                    }
                 )
             },
             nextLesson = nextLesson,
@@ -142,28 +162,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         id = course.id,
                         name = course.name,
                         professor = course.professor,
-                        examDate = course.examDate?.let { formatDate(it) }
+                        examDate = null
                     )
                 }
         )
-    }
-
-    private fun formatDate(timestamp: Long?): String {
-        if (timestamp == null) return "Data non impostata"
-
-        return Instant.ofEpochMilli(timestamp)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-    }
-
-    private fun statusLabel(status: String): String {
-        return when (status) {
-            CourseStatus.TO_STUDY.name -> "Da studiare"
-            CourseStatus.IN_PROGRESS.name -> "In corso"
-            CourseStatus.COMPLETED.name -> "Completato"
-            else -> status
-        }
     }
 
     private fun relativeDayLabel(date: LocalDate): String {

@@ -1,8 +1,5 @@
 package com.example.unilifeplanner.ui.courses
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
@@ -34,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -55,10 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.data.local.CourseEntity
-import com.example.unilifeplanner.notifications.NotificationHelper
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.courses.components.formatCourseStatus
-import com.example.unilifeplanner.ui.courses.components.formatExamDate
 import com.example.unilifeplanner.ui.utils.ExternalIntentResult
 import com.example.unilifeplanner.ui.utils.ExternalIntentUtils
 import kotlinx.coroutines.launch
@@ -69,26 +62,12 @@ fun CourseDetailScreen(
     viewModel: CourseViewModel = viewModel(),
     onEditCourseClick: () -> Unit,
     onOpenCourseLessonsClick: (Int) -> Unit,
+    onOpenCourseExamsClick: (Int) -> Unit,
     onBackClick: () -> Unit,
     onCourseDeleted: () -> Unit
 ) {
     val uiState by viewModel.courseDetailUiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            val course = uiState.course
-            if (granted && course != null) {
-                viewModel.toggleExamReminder(course)
-            } else {
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Permesso notifiche non concesso")
-                }
-            }
-        }
-    )
 
     LaunchedEffect(courseId) {
         viewModel.loadCourseById(courseId)
@@ -114,20 +93,8 @@ fun CourseDetailScreen(
         onBackClick = onBackClick,
         onEditCourseClick = onEditCourseClick,
         onOpenCourseLessonsClick = onOpenCourseLessonsClick,
+        onOpenCourseExamsClick = onOpenCourseExamsClick,
         onToggleFavorite = { course -> viewModel.toggleFavorite(course) },
-        onToggleReminder = { course ->
-            if (course.reminderEnabled) {
-                viewModel.toggleExamReminder(course)
-            } else if (!isValidFutureExamDate(course.examDate)) {
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar(reminderUnavailableMessage(course.examDate))
-                }
-            } else if (!NotificationHelper.hasNotificationPermission(context)) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                viewModel.toggleExamReminder(course)
-            }
-        },
         onDeleteCourse = { course -> viewModel.deleteCourse(course) }
     )
 }
@@ -140,8 +107,8 @@ private fun CourseDetailContent(
     onBackClick: () -> Unit,
     onEditCourseClick: () -> Unit,
     onOpenCourseLessonsClick: (Int) -> Unit,
+    onOpenCourseExamsClick: (Int) -> Unit,
     onToggleFavorite: (CourseEntity) -> Unit,
-    onToggleReminder: (CourseEntity) -> Unit,
     onDeleteCourse: (CourseEntity) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -190,8 +157,8 @@ private fun CourseDetailContent(
                     course = course,
                     onEditCourseClick = onEditCourseClick,
                     onDeleteClick = { showDeleteDialog = true },
-                    onToggleReminder = onToggleReminder,
                     onOpenCourseLessonsClick = onOpenCourseLessonsClick,
+                    onOpenCourseExamsClick = onOpenCourseExamsClick,
                     onExternalActionMessage = { message ->
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar(message)
@@ -232,8 +199,8 @@ private fun CourseDetailBody(
     course: CourseEntity,
     onEditCourseClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    onToggleReminder: (CourseEntity) -> Unit,
     onOpenCourseLessonsClick: (Int) -> Unit,
+    onOpenCourseExamsClick: (Int) -> Unit,
     onExternalActionMessage: (String) -> Unit
 ) {
     LazyColumn(
@@ -245,9 +212,9 @@ private fun CourseDetailBody(
             CourseInfoCard(course = course)
         }
         item {
-            ExamInfoCard(
-                course = course,
-                onToggleReminder = { onToggleReminder(course) }
+            CourseExamsLinkCard(
+                courseId = course.id,
+                onOpenCourseExamsClick = onOpenCourseExamsClick
             )
         }
         item {
@@ -270,6 +237,40 @@ private fun CourseDetailBody(
                 onEditCourseClick = onEditCourseClick,
                 onDeleteClick = onDeleteClick
             )
+        }
+    }
+}
+
+@Composable
+private fun CourseExamsLinkCard(
+    courseId: Int,
+    onOpenCourseExamsClick: (Int) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Esami",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Text(
+                text = "Visualizza e gestisci gli appelli d'esame collegati a questo corso.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedButton(
+                onClick = { onOpenCourseExamsClick(courseId) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Vai agli esami di questo corso")
+                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null
+                )
+            }
         }
     }
 }
@@ -345,65 +346,6 @@ private fun CourseInfoCard(course: CourseEntity) {
 }
 
 @Composable
-private fun ExamInfoCard(
-    course: CourseEntity,
-    onToggleReminder: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = "Esame",
-                style = MaterialTheme.typography.titleLarge
-            )
-            DetailRow(label = "Data", value = formatExamDate(course.examDate))
-            ReminderRow(
-                course = course,
-                onToggleReminder = onToggleReminder
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReminderRow(
-    course: CourseEntity,
-    onToggleReminder: () -> Unit
-) {
-    val enabled = isValidFutureExamDate(course.examDate)
-    val supportingText = when {
-        course.examDate == null -> "Aggiungi una data esame per attivare il promemoria"
-        !enabled -> "La data dell'esame e passata"
-        else -> "Notifiche il giorno prima e il giorno dell'esame"
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Promemoria esame",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = supportingText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = course.reminderEnabled && enabled,
-            onCheckedChange = { onToggleReminder() },
-            enabled = enabled
-        )
-    }
-}
-
-@Composable
 private fun NotesCard(notes: String?) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -439,19 +381,6 @@ private fun ExternalActionsCard(
                 text = "Azioni esterne",
                 style = MaterialTheme.typography.titleLarge
             )
-
-            Button(
-                onClick = {
-                    ExternalIntentUtils.addCourseToCalendar(context, course)
-                        .messageOrNull()
-                        ?.let(onExternalActionMessage)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(imageVector = Icons.Filled.CalendarMonth, contentDescription = null)
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Text(text = "Aggiungi al calendario")
-            }
 
             OutlinedButton(
                 onClick = {
@@ -559,18 +488,6 @@ private fun CourseDetailErrorState(message: String) {
             color = MaterialTheme.colorScheme.error,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-private fun isValidFutureExamDate(examDate: Long?): Boolean {
-    return examDate != null && examDate > System.currentTimeMillis()
-}
-
-private fun reminderUnavailableMessage(examDate: Long?): String {
-    return if (examDate == null) {
-        "Aggiungi una data esame per attivare il promemoria"
-    } else {
-        "La data dell'esame e passata"
     }
 }
 

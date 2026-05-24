@@ -24,6 +24,8 @@ import com.example.unilifeplanner.ui.auth.RegisterScreen
 import com.example.unilifeplanner.ui.courses.AddEditCourseScreen
 import com.example.unilifeplanner.ui.courses.CourseDetailScreen
 import com.example.unilifeplanner.ui.courses.CoursesScreen
+import com.example.unilifeplanner.ui.exams.AddEditExamScreen
+import com.example.unilifeplanner.ui.exams.ExamsScreen
 import com.example.unilifeplanner.ui.home.HomeScreen
 import com.example.unilifeplanner.ui.lessons.AddEditLessonScreen
 import com.example.unilifeplanner.ui.lessons.LessonsScreen
@@ -56,6 +58,8 @@ fun AppNavigation(
     val topLevelRoutes = setOf(
         Screen.Home.route,
         Screen.Courses.route,
+        Screen.Exams.route,
+        Screen.Exams.createRoute(),
         Screen.Lessons.route,
         Screen.Lessons.createRoute(),
         Screen.Statistics.route,
@@ -65,13 +69,15 @@ fun AppNavigation(
         Screen.Profile.route,
         Screen.Settings.route
     )
-    val isTopLevelRoute = currentRoute in topLevelRoutes || isLessonsRoute(currentRoute)
+    val isTopLevelRoute = currentRoute in topLevelRoutes ||
+        isLessonsRoute(currentRoute) ||
+        isExamsRoute(currentRoute)
     val onOpenDrawer: () -> Unit = {
         coroutineScope.launch {
             drawerState.open()
         }
     }
-    val navigateToTopLevel: (String) -> Unit = { route ->
+    val navigateToTopLevel: (String, Boolean) -> Unit = { route, restoreState ->
         coroutineScope.launch {
             drawerState.close()
             navController.navigate(route) {
@@ -79,7 +85,7 @@ fun AppNavigation(
                     saveState = true
                 }
                 launchSingleTop = true
-                restoreState = true
+                this.restoreState = restoreState
             }
         }
     }
@@ -105,14 +111,15 @@ fun AppNavigation(
         currentRoute = currentRoute,
         isAuthenticated = authUiState.isAuthenticated,
         gesturesEnabled = isTopLevelRoute,
-        onNavigateHome = { navigateToTopLevel(Screen.Home.route) },
-        onNavigateCourses = { navigateToTopLevel(Screen.Courses.route) },
-        onNavigateLessons = { navigateToTopLevel(Screen.Lessons.createRoute()) },
-        onNavigateStatistics = { navigateToTopLevel(Screen.Statistics.route) },
-        onNavigatePublicUniboImport = { navigateToTopLevel(Screen.PublicUniboImport.route) },
-        onNavigateMap = { navigateToTopLevel(Screen.Map.route) },
-        onNavigateProfile = { navigateToTopLevel(Screen.Profile.route) },
-        onNavigateSettings = { navigateToTopLevel(Screen.Settings.route) },
+        onNavigateHome = { navigateToTopLevel(Screen.Home.route, true) },
+        onNavigateCourses = { navigateToTopLevel(Screen.Courses.route, true) },
+        onNavigateExams = { navigateToTopLevel(Screen.Exams.createRoute(), false) },
+        onNavigateLessons = { navigateToTopLevel(Screen.Lessons.createRoute(), true) },
+        onNavigateStatistics = { navigateToTopLevel(Screen.Statistics.route, true) },
+        onNavigatePublicUniboImport = { navigateToTopLevel(Screen.PublicUniboImport.route, true) },
+        onNavigateMap = { navigateToTopLevel(Screen.Map.route, true) },
+        onNavigateProfile = { navigateToTopLevel(Screen.Profile.route, true) },
+        onNavigateSettings = { navigateToTopLevel(Screen.Settings.route, true) },
         onLogout = logoutFromDrawer
     ) {
         NavHost(
@@ -172,6 +179,36 @@ fun AppNavigation(
             }
 
             composable(
+                route = Screen.Exams.route,
+                arguments = listOf(
+                    navArgument(Screen.Exams.ARG_COURSE_ID) {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    }
+                )
+            ) { backStackEntry ->
+                val courseId = backStackEntry.arguments
+                    ?.getInt(Screen.Exams.ARG_COURSE_ID)
+                    ?.takeIf { it > 0 }
+
+                ExamsScreen(
+                    initialCourseId = courseId,
+                    onMenuClick = onOpenDrawer,
+                    onAddExamClick = { selectedCourseId ->
+                        navController.navigate(Screen.AddEditExam.createRoute(selectedCourseId))
+                    },
+                    onEditExamClick = { examAppealId ->
+                        navController.navigate(
+                            Screen.AddEditExam.createRoute(examAppealId = examAppealId)
+                        )
+                    },
+                    onOpenCourseClick = { selectedCourseId ->
+                        navController.navigate(Screen.CourseDetail.createRoute(selectedCourseId))
+                    }
+                )
+            }
+
+            composable(
                 route = Screen.Lessons.route,
                 arguments = listOf(
                     navArgument(Screen.Lessons.ARG_COURSE_ID) {
@@ -220,6 +257,9 @@ fun AppNavigation(
                     },
                     onOpenCourseLessonsClick = { selectedCourseId ->
                         navController.navigate(Screen.Lessons.createRoute(selectedCourseId))
+                    },
+                    onOpenCourseExamsClick = { selectedCourseId ->
+                        navController.navigate(Screen.Exams.createRoute(selectedCourseId))
                     },
                     onBackClick = {
                         navController.popBackStack()
@@ -276,6 +316,35 @@ fun AppNavigation(
                 AddEditLessonScreen(
                     courseId = courseId,
                     lessonId = lessonId,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.AddEditExam.route,
+                arguments = listOf(
+                    navArgument(Screen.AddEditExam.ARG_COURSE_ID) {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    },
+                    navArgument(Screen.AddEditExam.ARG_EXAM_APPEAL_ID) {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    }
+                )
+            ) { backStackEntry ->
+                val courseId = backStackEntry.arguments
+                    ?.getInt(Screen.AddEditExam.ARG_COURSE_ID)
+                    ?.takeIf { it > 0 }
+                val examAppealId = backStackEntry.arguments
+                    ?.getInt(Screen.AddEditExam.ARG_EXAM_APPEAL_ID)
+                    ?.takeIf { it > 0 }
+
+                AddEditExamScreen(
+                    courseId = courseId,
+                    examAppealId = examAppealId,
                     onNavigateBack = {
                         navController.popBackStack()
                     }
@@ -377,4 +446,8 @@ fun AppNavigation(
 
 private fun isLessonsRoute(currentRoute: String?): Boolean {
     return currentRoute?.startsWith("lessons") == true || currentRoute == Screen.Lessons.route
+}
+
+private fun isExamsRoute(currentRoute: String?): Boolean {
+    return currentRoute?.startsWith("exams") == true || currentRoute == Screen.Exams.route
 }

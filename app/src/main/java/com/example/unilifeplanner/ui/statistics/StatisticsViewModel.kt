@@ -5,9 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.data.local.ExamAppealWithCourse
 import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
+import com.example.unilifeplanner.domain.exams.examStartMillis
 import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
 import com.example.unilifeplanner.domain.lessons.weeklyLessonDurationMinutes
 import com.example.unilifeplanner.domain.model.CourseStatus
@@ -23,12 +26,17 @@ class StatisticsViewModel(
     private val database = AppDatabase.getDatabase(application.applicationContext)
     private val repository = CourseRepository(database.courseDao())
     private val lessonRepository = LessonRepository(database.lessonDao())
+    private val examAppealRepository = ExamAppealRepository(database.examAppealDao())
 
     val uiState: StateFlow<StatisticsUiState> = combine(
         repository.allCourses,
-        lessonRepository.getAllLessons()
-    ) { courses, lessons ->
-        courses.toStatisticsUiState(lessons)
+        lessonRepository.getAllLessons(),
+        examAppealRepository.getExamAppealsWithCourse()
+    ) { courses, lessons, exams ->
+        courses.toStatisticsUiState(
+            lessons = lessons,
+            exams = exams
+        )
     }
         .stateIn(
             scope = viewModelScope,
@@ -37,7 +45,8 @@ class StatisticsViewModel(
         )
 
     private fun List<CourseEntity>.toStatisticsUiState(
-        lessons: List<LessonEntity>
+        lessons: List<LessonEntity>,
+        exams: List<ExamAppealWithCourse>
     ): StatisticsUiState {
         if (isEmpty()) {
             return StatisticsUiState()
@@ -55,9 +64,16 @@ class StatisticsViewModel(
             0f
         }
         val now = System.currentTimeMillis()
-        val nextExam = asSequence()
-            .filter { course -> course.examDate != null && course.examDate > now }
-            .minByOrNull { course -> requireNotNull(course.examDate) }
+        val nextExam = exams
+            .asSequence()
+            .map { exam ->
+                exam to examStartMillis(
+                    dateMillis = exam.exam.dateMillis,
+                    timeMinutes = exam.exam.timeMinutes
+                )
+            }
+            .filter { (_, startMillis) -> startMillis > now }
+            .minByOrNull { (_, startMillis) -> startMillis }
         val busiestLessonDay = lessons
             .groupingBy { lesson -> lesson.dayOfWeek }
             .eachCount()
@@ -83,8 +99,8 @@ class StatisticsViewModel(
             totalCredits = totalCredits,
             completedCredits = completedCredits,
             completionPercentage = completionPercentage.coerceIn(0f, 1f),
-            nextExamName = nextExam?.name,
-            nextExamDate = nextExam?.examDate,
+            nextExamName = nextExam?.first?.courseName,
+            nextExamDate = nextExam?.first?.exam?.dateMillis,
             isEmpty = false
         )
     }

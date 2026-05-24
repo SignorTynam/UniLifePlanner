@@ -23,7 +23,7 @@ interface CourseDao {
     @Query("DELETE FROM courses WHERE id = :courseId")
     suspend fun deleteCourseById(courseId: Int)
 
-    @Query("SELECT * FROM courses ORDER BY examDate IS NULL ASC, examDate ASC, name ASC")
+    @Query("SELECT * FROM courses ORDER BY name ASC")
     fun getAllCourses(): Flow<List<CourseEntity>>
 
     @Query("SELECT * FROM courses WHERE id = :courseId")
@@ -75,7 +75,7 @@ interface CourseDao {
         SELECT * FROM courses
         WHERE name LIKE '%' || :query || '%'
            OR professor LIKE '%' || :query || '%'
-        ORDER BY examDate IS NULL ASC, examDate ASC, name ASC
+        ORDER BY name ASC
         """
     )
     fun searchCourses(query: String): Flow<List<CourseEntity>>
@@ -84,7 +84,7 @@ interface CourseDao {
         """
         SELECT * FROM courses
         WHERE status = :status
-        ORDER BY examDate IS NULL ASC, examDate ASC, name ASC
+        ORDER BY name ASC
         """
     )
     fun getCoursesByStatus(status: String): Flow<List<CourseEntity>>
@@ -93,7 +93,7 @@ interface CourseDao {
         """
         SELECT * FROM courses
         WHERE isFavorite = 1
-        ORDER BY examDate IS NULL ASC, examDate ASC, name ASC
+        ORDER BY name ASC
         """
     )
     fun getFavoriteCourses(): Flow<List<CourseEntity>>

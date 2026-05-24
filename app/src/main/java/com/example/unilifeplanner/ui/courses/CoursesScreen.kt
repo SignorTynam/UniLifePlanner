@@ -352,7 +352,7 @@ private fun filterLabel(filter: CourseStatusFilter): String {
 private fun sortLabel(option: CourseSortOption): String {
     return when (option) {
         CourseSortOption.DEFAULT -> "Ordine standard"
-        CourseSortOption.EXAM_DATE_ASC -> "Data esame"
+        CourseSortOption.CREDITS_DESC -> "CFU"
         CourseSortOption.NAME_ASC -> "Nome A-Z"
     }
 }

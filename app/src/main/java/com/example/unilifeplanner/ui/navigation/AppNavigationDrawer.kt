@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
@@ -48,6 +49,7 @@ fun AppNavigationDrawer(
     gesturesEnabled: Boolean,
     onNavigateHome: () -> Unit,
     onNavigateCourses: () -> Unit,
+    onNavigateExams: () -> Unit,
     onNavigateLessons: () -> Unit,
     onNavigateStatistics: () -> Unit,
     onNavigatePublicUniboImport: () -> Unit,
@@ -77,6 +79,7 @@ fun AppNavigationDrawer(
                 currentRoute = currentRoute,
                 onNavigateHome = onNavigateHome,
                 onNavigateCourses = onNavigateCourses,
+                onNavigateExams = onNavigateExams,
                 onNavigateLessons = onNavigateLessons,
                 onNavigateStatistics = onNavigateStatistics,
                 onNavigatePublicUniboImport = onNavigatePublicUniboImport,
@@ -96,6 +99,7 @@ private fun AppDrawerContent(
     currentRoute: String?,
     onNavigateHome: () -> Unit,
     onNavigateCourses: () -> Unit,
+    onNavigateExams: () -> Unit,
     onNavigateLessons: () -> Unit,
     onNavigateStatistics: () -> Unit,
     onNavigatePublicUniboImport: () -> Unit,
@@ -131,6 +135,12 @@ private fun AppDrawerContent(
             icon = Icons.Filled.Event,
             selected = isLessonsRoute(currentRoute),
             onClick = onNavigateLessons
+        )
+        AppDrawerItem(
+            label = "Esami",
+            icon = Icons.Filled.CalendarMonth,
+            selected = isExamsRoute(currentRoute),
+            onClick = onNavigateExams
         )
         AppDrawerItem(
             label = "Statistiche",
@@ -254,4 +264,8 @@ private fun AppDrawerItem(
 
 private fun isLessonsRoute(currentRoute: String?): Boolean {
     return currentRoute?.startsWith("lessons") == true || currentRoute == Screen.Lessons.route
+}
+
+private fun isExamsRoute(currentRoute: String?): Boolean {
+    return currentRoute?.startsWith("exams") == true || currentRoute == Screen.Exams.route
 }

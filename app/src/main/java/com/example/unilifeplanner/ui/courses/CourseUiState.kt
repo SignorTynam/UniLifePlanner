@@ -22,6 +22,6 @@ enum class CourseStatusFilter {
 
 enum class CourseSortOption {
     DEFAULT,
-    EXAM_DATE_ASC,
+    CREDITS_DESC,
     NAME_ASC
 }

@@ -11,14 +11,16 @@ import com.example.unilifeplanner.domain.lessons.nextLessonDateMillis
 @Database(
     entities = [
         CourseEntity::class,
-        LessonEntity::class
+        LessonEntity::class,
+        ExamAppealEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun courseDao(): CourseDao
     abstract fun lessonDao(): LessonDao
+    abstract fun examAppealDao(): ExamAppealDao
 
     companion object {
         @Volatile
@@ -37,7 +39,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8
                     )
                     .build()
 
@@ -196,6 +199,89 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
             }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createExamAppealsTable(db)
+                migrateLegacyCourseExams(db)
+            }
+        }
+
+        private fun createExamAppealsTable(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS exam_appeals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    courseId INTEGER NOT NULL,
+                    dateMillis INTEGER NOT NULL,
+                    timeMinutes INTEGER,
+                    location TEXT,
+                    notes TEXT,
+                    type TEXT,
+                    reminderEnabled INTEGER NOT NULL DEFAULT 0,
+                    reminderDateTimeMillis INTEGER,
+                    source TEXT NOT NULL DEFAULT 'MANUAL',
+                    externalId TEXT,
+                    officialUrl TEXT,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    FOREIGN KEY(courseId) REFERENCES courses(id) ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_exam_appeals_courseId ON exam_appeals(courseId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_exam_appeals_dateMillis ON exam_appeals(dateMillis)")
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS index_exam_appeals_source_externalId
+                ON exam_appeals(source, externalId)
+                """.trimIndent()
+            )
+        }
+
+        private fun migrateLegacyCourseExams(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                INSERT INTO exam_appeals (
+                    courseId,
+                    dateMillis,
+                    timeMinutes,
+                    location,
+                    notes,
+                    type,
+                    reminderEnabled,
+                    reminderDateTimeMillis,
+                    source,
+                    externalId,
+                    officialUrl,
+                    createdAt,
+                    updatedAt
+                )
+                SELECT
+                    id,
+                    examDate,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    reminderEnabled,
+                    NULL,
+                    'MANUAL',
+                    'legacy_course_exam_' || id,
+                    NULL,
+                    createdAt,
+                    updatedAt
+                FROM courses
+                WHERE examDate IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM exam_appeals
+                      WHERE exam_appeals.source = 'MANUAL'
+                        AND exam_appeals.externalId = 'legacy_course_exam_' || courses.id
+                  )
+                """.trimIndent()
+            )
         }
 
         private fun backfillLessonDates(db: SupportSQLiteDatabase) {

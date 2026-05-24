@@ -7,9 +7,6 @@ import android.net.Uri
 import android.provider.CalendarContract
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.ui.courses.components.formatCourseStatus
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 object ExternalIntentUtils {
     private const val EXAM_DURATION_MILLIS = 2 * 60 * 60 * 1000L
@@ -174,17 +171,10 @@ object ExternalIntentUtils {
         return buildString {
             appendLine("Corso: ${course.name}")
             appendLine("Docente: ${course.professor}")
-            appendLine("Data esame: ${formatShareDate(course.examDate)}")
             appendLine("CFU: ${course.credits}")
             appendLine("Stato: ${formatCourseStatus(course.status)}")
             append("Note: ${course.notes?.takeIf { it.isNotBlank() } ?: "Nessuna nota"}")
         }
-    }
-
-    private fun formatShareDate(timestamp: Long?): String {
-        return timestamp?.let {
-            SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.ITALY).format(Date(it))
-        } ?: "Non impostata"
     }
 }
 

@@ -30,12 +30,6 @@ import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.ui.components.InfoPill
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private val ExamDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CourseCard(
@@ -102,7 +96,6 @@ fun CourseCard(
                     InfoPill(text = "UniBo")
                 }
                 InfoPill(text = "${course.credits} CFU")
-                InfoPill(text = formatExamDate(course.examDate))
             }
         }
     }
@@ -159,15 +152,6 @@ fun formatCourseStatus(status: String): String {
         CourseStatus.COMPLETED.name -> "Completato"
         else -> status
     }
-}
-
-fun formatExamDate(timestamp: Long?): String {
-    if (timestamp == null) return "Data non impostata"
-
-    return Instant.ofEpochMilli(timestamp)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-        .format(ExamDateFormatter)
 }
 
 @Preview(showBackground = true)
