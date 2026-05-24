@@ -81,7 +81,13 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             .filter { matchesDateFilter(it, filters.dateFilter, nowMillis) }
 
         val lessonItems = filteredLessons.map { it.toLessonListItemUi(nowMillis) }
-        val (pastThisWeek, upcoming) = lessonItems.partition { it.isPastThisWeek }
+        val shouldGroupPastThisWeek = filters.dateFilter == LessonDateFilter.TODAY ||
+            filters.dateFilter == LessonDateFilter.THIS_WEEK
+        val (pastThisWeek, upcoming) = if (shouldGroupPastThisWeek) {
+            lessonItems.partition { it.isPastThisWeek }
+        } else {
+            emptyList<LessonListItemUi>() to lessonItems
+        }
 
         LessonsUiState(
             isLoading = isLoading,
