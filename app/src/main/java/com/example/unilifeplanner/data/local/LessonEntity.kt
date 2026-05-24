@@ -16,7 +16,11 @@ import androidx.room.PrimaryKey
         )
     ],
     indices = [
-        Index(value = ["courseId"])
+        Index(value = ["courseId"]),
+        Index(
+            value = ["sourceProvider", "externalId"],
+            name = "index_lessons_sourceProvider_externalId"
+        )
     ]
 )
 data class LessonEntity(
@@ -31,6 +35,9 @@ data class LessonEntity(
     val locationQuery: String? = null,
     val notes: String? = null,
     val reminderEnabled: Boolean = true,
+    val externalId: String? = null,
+    val sourceProvider: String? = null,
+    val officialUrl: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )

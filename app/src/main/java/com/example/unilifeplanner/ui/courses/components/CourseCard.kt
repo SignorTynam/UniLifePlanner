@@ -98,6 +98,9 @@ fun CourseCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 StatusPill(status = course.status)
+                if (course.sourceProvider == "UNIBO_PUBLIC") {
+                    InfoPill(text = "UniBo")
+                }
                 InfoPill(text = "${course.credits} CFU")
                 InfoPill(text = formatExamDate(course.examDate))
             }

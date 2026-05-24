@@ -23,6 +23,12 @@ class LessonRepository(
     fun getLessonById(lessonId: Int): Flow<LessonEntity?> =
         lessonDao.getLessonById(lessonId)
 
+    suspend fun getLessonByExternalId(
+        provider: String,
+        externalId: String
+    ): LessonEntity? =
+        lessonDao.getLessonByExternalId(provider, externalId)
+
     suspend fun getLessonsWithReminderEnabled(): List<LessonEntity> =
         lessonDao.getLessonsWithReminderEnabled()
 
@@ -35,6 +41,7 @@ class LessonRepository(
                 building = lesson.building?.trim()?.takeIf { it.isNotEmpty() },
                 locationQuery = lesson.locationQuery?.trim()?.takeIf { it.isNotEmpty() },
                 notes = lesson.notes?.trim()?.takeIf { it.isNotEmpty() },
+                officialUrl = lesson.officialUrl?.trim()?.takeIf { it.isNotEmpty() },
                 createdAt = now,
                 updatedAt = now
             )
@@ -48,9 +55,50 @@ class LessonRepository(
                 building = lesson.building?.trim()?.takeIf { it.isNotEmpty() },
                 locationQuery = lesson.locationQuery?.trim()?.takeIf { it.isNotEmpty() },
                 notes = lesson.notes?.trim()?.takeIf { it.isNotEmpty() },
+                externalId = lesson.externalId?.trim()?.takeIf { it.isNotEmpty() },
+                sourceProvider = lesson.sourceProvider?.trim()?.takeIf { it.isNotEmpty() },
+                officialUrl = lesson.officialUrl?.trim()?.takeIf { it.isNotEmpty() },
                 updatedAt = System.currentTimeMillis()
             )
         )
+    }
+
+    suspend fun upsertImportedLesson(
+        provider: String,
+        externalId: String,
+        lesson: LessonEntity
+    ): ImportedUpsertResult {
+        val now = System.currentTimeMillis()
+        val existing = lessonDao.getLessonByExternalId(provider, externalId)
+        val normalizedLesson = lesson.copy(
+            classroom = lesson.classroom?.trim()?.takeIf { it.isNotEmpty() },
+            building = lesson.building?.trim()?.takeIf { it.isNotEmpty() },
+            locationQuery = lesson.locationQuery?.trim()?.takeIf { it.isNotEmpty() },
+            notes = lesson.notes?.trim()?.takeIf { it.isNotEmpty() },
+            externalId = externalId.trim(),
+            sourceProvider = provider,
+            officialUrl = lesson.officialUrl?.trim()?.takeIf { it.isNotEmpty() },
+            updatedAt = now
+        )
+
+        return if (existing == null) {
+            val insertedId = lessonDao.insertLesson(
+                normalizedLesson.copy(
+                    id = 0,
+                    createdAt = now
+                )
+            ).toInt()
+            ImportedUpsertResult(id = insertedId, inserted = true)
+        } else {
+            lessonDao.updateLesson(
+                normalizedLesson.copy(
+                    id = existing.id,
+                    reminderEnabled = existing.reminderEnabled,
+                    createdAt = existing.createdAt
+                )
+            )
+            ImportedUpsertResult(id = existing.id, inserted = false)
+        }
     }
 
     suspend fun deleteLesson(lesson: LessonEntity) {
@@ -73,5 +121,12 @@ class LessonRepository(
 
     suspend fun deleteLessonsForCourse(courseId: Int) {
         lessonDao.deleteLessonsForCourse(courseId)
+    }
+
+    suspend fun getLessonsBySourceProvider(provider: String): List<LessonEntity> =
+        lessonDao.getLessonsBySourceProvider(provider)
+
+    suspend fun deleteLessonsBySourceProvider(provider: String) {
+        lessonDao.deleteLessonsBySourceProvider(provider)
     }
 }

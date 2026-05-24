@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CourseEntity::class,
         LessonEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,7 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "unilife_planner_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
 
                 INSTANCE = instance
@@ -126,6 +126,30 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE courses")
                 db.execSQL("ALTER TABLE courses_new RENAME TO courses")
                 db.execSQL("ALTER TABLE lessons ADD COLUMN locationQuery TEXT")
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE courses ADD COLUMN externalId TEXT")
+                db.execSQL("ALTER TABLE courses ADD COLUMN sourceProvider TEXT")
+                db.execSQL("ALTER TABLE courses ADD COLUMN officialUrl TEXT")
+                db.execSQL("ALTER TABLE courses ADD COLUMN classroom TEXT")
+                db.execSQL("ALTER TABLE lessons ADD COLUMN externalId TEXT")
+                db.execSQL("ALTER TABLE lessons ADD COLUMN sourceProvider TEXT")
+                db.execSQL("ALTER TABLE lessons ADD COLUMN officialUrl TEXT")
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS index_courses_sourceProvider_externalId
+                    ON courses(sourceProvider, externalId)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS index_lessons_sourceProvider_externalId
+                    ON lessons(sourceProvider, externalId)
+                    """.trimIndent()
+                )
             }
         }
     }

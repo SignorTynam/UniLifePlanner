@@ -32,6 +32,8 @@ import com.example.unilifeplanner.ui.navigation.AppNavigationDrawer
 import com.example.unilifeplanner.ui.profile.ProfileScreen
 import com.example.unilifeplanner.ui.settings.SettingsScreen
 import com.example.unilifeplanner.ui.statistics.StatisticsScreen
+import com.example.unilifeplanner.ui.university.PublicUniboImportScreen
+import com.example.unilifeplanner.ui.university.UniversityScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,6 +59,8 @@ fun AppNavigation(
         Screen.Lessons.route,
         Screen.Lessons.createRoute(),
         Screen.Statistics.route,
+        Screen.University.route,
+        Screen.PublicUniboImport.route,
         Screen.Map.route,
         Screen.Profile.route,
         Screen.Settings.route
@@ -105,6 +109,8 @@ fun AppNavigation(
         onNavigateCourses = { navigateToTopLevel(Screen.Courses.route) },
         onNavigateLessons = { navigateToTopLevel(Screen.Lessons.createRoute()) },
         onNavigateStatistics = { navigateToTopLevel(Screen.Statistics.route) },
+        onNavigateUniversity = { navigateToTopLevel(Screen.University.route) },
+        onNavigatePublicUniboImport = { navigateToTopLevel(Screen.PublicUniboImport.route) },
         onNavigateMap = { navigateToTopLevel(Screen.Map.route) },
         onNavigateProfile = { navigateToTopLevel(Screen.Profile.route) },
         onNavigateSettings = { navigateToTopLevel(Screen.Settings.route) },
@@ -333,6 +339,29 @@ fun AppNavigation(
             composable(Screen.Statistics.route) {
                 StatisticsScreen(
                     onMenuClick = onOpenDrawer
+                )
+            }
+
+            composable(Screen.University.route) {
+                UniversityScreen(
+                    onMenuClick = onOpenDrawer,
+                    onOpenPublicUniboImportClick = {
+                        navController.navigate(Screen.PublicUniboImport.route)
+                    }
+                )
+            }
+
+            composable(Screen.PublicUniboImport.route) {
+                PublicUniboImportScreen(
+                    onMenuClick = onOpenDrawer,
+                    onGoToCoursesClick = {
+                        navController.navigate(Screen.Courses.route) {
+                            popUpTo(Screen.Courses.route) {
+                                inclusive = false
+                            }
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
         }

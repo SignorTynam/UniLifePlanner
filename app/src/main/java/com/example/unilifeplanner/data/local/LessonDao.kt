@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -33,6 +34,47 @@ interface LessonDao {
 
     @Query("SELECT * FROM lessons WHERE id = :lessonId")
     fun getLessonById(lessonId: Int): Flow<LessonEntity?>
+
+    @Query(
+        """
+        SELECT * FROM lessons
+        WHERE sourceProvider = :sourceProvider
+          AND externalId = :externalId
+        LIMIT 1
+        """
+    )
+    suspend fun getLessonByExternalId(
+        sourceProvider: String,
+        externalId: String
+    ): LessonEntity?
+
+    @Transaction
+    suspend fun upsertImportedLesson(
+        provider: String,
+        externalId: String,
+        lesson: LessonEntity
+    ): Long {
+        val existing = getLessonByExternalId(provider, externalId)
+        return if (existing == null) {
+            insertLesson(
+                lesson.copy(
+                    id = 0,
+                    sourceProvider = provider,
+                    externalId = externalId
+                )
+            )
+        } else {
+            updateLesson(
+                lesson.copy(
+                    id = existing.id,
+                    sourceProvider = provider,
+                    externalId = externalId,
+                    createdAt = existing.createdAt
+                )
+            )
+            existing.id.toLong()
+        }
+    }
 
     @Query("SELECT * FROM lessons ORDER BY dayOfWeek ASC, startTimeMinutes ASC")
     fun getAllLessons(): Flow<List<LessonEntity>>
@@ -76,4 +118,10 @@ interface LessonDao {
 
     @Query("DELETE FROM lessons WHERE courseId = :courseId")
     suspend fun deleteLessonsForCourse(courseId: Int)
+
+    @Query("SELECT * FROM lessons WHERE sourceProvider = :provider")
+    suspend fun getLessonsBySourceProvider(provider: String): List<LessonEntity>
+
+    @Query("DELETE FROM lessons WHERE sourceProvider = :provider")
+    suspend fun deleteLessonsBySourceProvider(provider: String)
 }

@@ -8,12 +8,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.compose.rememberNavController
 import com.example.unilifeplanner.data.datastore.SettingsDataStore
 import com.example.unilifeplanner.data.repository.SettingsRepository
 import com.example.unilifeplanner.domain.model.ThemeMode
-import com.example.unilifeplanner.notifications.NotificationHelper
-import androidx.navigation.compose.rememberNavController
 import com.example.unilifeplanner.navigation.AppNavigation
+import com.example.unilifeplanner.notifications.NotificationHelper
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 
 class MainActivity : ComponentActivity() {

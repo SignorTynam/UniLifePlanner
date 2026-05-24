@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
@@ -49,6 +51,8 @@ fun AppNavigationDrawer(
     onNavigateCourses: () -> Unit,
     onNavigateLessons: () -> Unit,
     onNavigateStatistics: () -> Unit,
+    onNavigateUniversity: () -> Unit,
+    onNavigatePublicUniboImport: () -> Unit,
     onNavigateMap: () -> Unit,
     onNavigateProfile: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -77,6 +81,8 @@ fun AppNavigationDrawer(
                 onNavigateCourses = onNavigateCourses,
                 onNavigateLessons = onNavigateLessons,
                 onNavigateStatistics = onNavigateStatistics,
+                onNavigateUniversity = onNavigateUniversity,
+                onNavigatePublicUniboImport = onNavigatePublicUniboImport,
                 onNavigateMap = onNavigateMap,
                 onNavigateProfile = onNavigateProfile,
                 onNavigateSettings = onNavigateSettings,
@@ -95,6 +101,8 @@ private fun AppDrawerContent(
     onNavigateCourses: () -> Unit,
     onNavigateLessons: () -> Unit,
     onNavigateStatistics: () -> Unit,
+    onNavigateUniversity: () -> Unit,
+    onNavigatePublicUniboImport: () -> Unit,
     onNavigateMap: () -> Unit,
     onNavigateProfile: () -> Unit,
     onNavigateSettings: () -> Unit,
@@ -133,6 +141,18 @@ private fun AppDrawerContent(
             icon = Icons.Filled.BarChart,
             selected = currentRoute == Screen.Statistics.route,
             onClick = onNavigateStatistics
+        )
+        AppDrawerItem(
+            label = "Università",
+            icon = Icons.Filled.AccountBalance,
+            selected = currentRoute == Screen.University.route,
+            onClick = onNavigateUniversity
+        )
+        AppDrawerItem(
+            label = "Importa UniBo",
+            icon = Icons.Filled.CloudDownload,
+            selected = currentRoute == Screen.PublicUniboImport.route,
+            onClick = onNavigatePublicUniboImport
         )
         AppDrawerItem(
             label = "Mappa",

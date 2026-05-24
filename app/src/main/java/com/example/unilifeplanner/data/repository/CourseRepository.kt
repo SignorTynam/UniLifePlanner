@@ -14,6 +14,12 @@ class CourseRepository(
     fun getCourseById(courseId: Int): Flow<CourseEntity?> =
         courseDao.getCourseById(courseId)
 
+    suspend fun getCourseByExternalId(
+        provider: String,
+        externalId: String
+    ): CourseEntity? =
+        courseDao.getCourseByExternalId(provider, externalId)
+
     fun searchCourses(query: String): Flow<List<CourseEntity>> =
         courseDao.searchCourses(query.trim())
 
@@ -30,7 +36,9 @@ class CourseRepository(
                 id = 0,
                 name = course.name.trim(),
                 professor = course.professor.trim(),
+                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
                 notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
+                officialUrl = course.officialUrl?.trim()?.takeIf { it.isNotEmpty() },
                 createdAt = now,
                 updatedAt = now
             )
@@ -57,6 +65,7 @@ class CourseRepository(
                 status = status.name,
                 isFavorite = isFavorite,
                 reminderEnabled = reminderEnabled,
+                classroom = null,
                 notes = notes?.trim()?.takeIf { it.isNotEmpty() },
                 createdAt = now,
                 updatedAt = now
@@ -84,6 +93,7 @@ class CourseRepository(
                 status = status.name,
                 isFavorite = isFavorite,
                 reminderEnabled = reminderEnabled,
+                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
                 notes = notes?.trim()?.takeIf { it.isNotEmpty() },
                 updatedAt = System.currentTimeMillis()
             )
@@ -95,10 +105,55 @@ class CourseRepository(
             course.copy(
                 name = course.name.trim(),
                 professor = course.professor.trim(),
+                classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
                 notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
+                externalId = course.externalId?.trim()?.takeIf { it.isNotEmpty() },
+                sourceProvider = course.sourceProvider?.trim()?.takeIf { it.isNotEmpty() },
+                officialUrl = course.officialUrl?.trim()?.takeIf { it.isNotEmpty() },
                 updatedAt = System.currentTimeMillis()
             )
         )
+    }
+
+    suspend fun upsertImportedCourse(
+        provider: String,
+        externalId: String,
+        course: CourseEntity
+    ): ImportedUpsertResult {
+        val now = System.currentTimeMillis()
+        val existing = courseDao.getCourseByExternalId(provider, externalId)
+        val normalizedCourse = course.copy(
+            name = course.name.trim(),
+            professor = course.professor.trim().ifBlank { "Docente non indicato" },
+            classroom = course.classroom?.trim()?.takeIf { it.isNotEmpty() },
+            notes = course.notes?.trim()?.takeIf { it.isNotEmpty() },
+            externalId = externalId.trim(),
+            sourceProvider = provider,
+            officialUrl = course.officialUrl?.trim()?.takeIf { it.isNotEmpty() },
+            updatedAt = now
+        )
+
+        return if (existing == null) {
+            val insertedId = courseDao.insertCourse(
+                normalizedCourse.copy(
+                    id = 0,
+                    createdAt = now
+                )
+            ).toInt()
+            ImportedUpsertResult(id = insertedId, inserted = true)
+        } else {
+            courseDao.updateCourse(
+                normalizedCourse.copy(
+                    id = existing.id,
+                    examDate = existing.examDate,
+                    status = existing.status,
+                    isFavorite = existing.isFavorite,
+                    reminderEnabled = existing.reminderEnabled,
+                    createdAt = existing.createdAt
+                )
+            )
+            ImportedUpsertResult(id = existing.id, inserted = false)
+        }
     }
 
     suspend fun deleteCourse(course: CourseEntity) {
@@ -144,4 +199,16 @@ class CourseRepository(
     suspend fun deleteAllCourses() {
         courseDao.deleteAllCourses()
     }
+
+    suspend fun getCoursesBySourceProvider(provider: String): List<CourseEntity> =
+        courseDao.getCoursesBySourceProvider(provider)
+
+    suspend fun deleteCoursesBySourceProvider(provider: String) {
+        courseDao.deleteCoursesBySourceProvider(provider)
+    }
 }
+
+data class ImportedUpsertResult(
+    val id: Int,
+    val inserted: Boolean
+)

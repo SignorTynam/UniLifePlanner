@@ -9,6 +9,8 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object Map : Screen("map")
     data object Statistics : Screen("statistics")
+    data object University : Screen("university")
+    data object PublicUniboImport : Screen("public_unibo_import")
 
     data object Lessons : Screen("lessons?courseId={courseId}") {
         const val ARG_COURSE_ID = "courseId"

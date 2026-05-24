@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -27,6 +28,47 @@ interface CourseDao {
 
     @Query("SELECT * FROM courses WHERE id = :courseId")
     fun getCourseById(courseId: Int): Flow<CourseEntity?>
+
+    @Query(
+        """
+        SELECT * FROM courses
+        WHERE sourceProvider = :sourceProvider
+          AND externalId = :externalId
+        LIMIT 1
+        """
+    )
+    suspend fun getCourseByExternalId(
+        sourceProvider: String,
+        externalId: String
+    ): CourseEntity?
+
+    @Transaction
+    suspend fun upsertImportedCourse(
+        provider: String,
+        externalId: String,
+        course: CourseEntity
+    ): Long {
+        val existing = getCourseByExternalId(provider, externalId)
+        return if (existing == null) {
+            insertCourse(
+                course.copy(
+                    id = 0,
+                    sourceProvider = provider,
+                    externalId = externalId
+                )
+            )
+        } else {
+            updateCourse(
+                course.copy(
+                    id = existing.id,
+                    sourceProvider = provider,
+                    externalId = externalId,
+                    createdAt = existing.createdAt
+                )
+            )
+            existing.id.toLong()
+        }
+    }
 
     @Query(
         """
@@ -96,4 +138,10 @@ interface CourseDao {
 
     @Query("DELETE FROM courses")
     suspend fun deleteAllCourses()
+
+    @Query("SELECT * FROM courses WHERE sourceProvider = :provider")
+    suspend fun getCoursesBySourceProvider(provider: String): List<CourseEntity>
+
+    @Query("DELETE FROM courses WHERE sourceProvider = :provider")
+    suspend fun deleteCoursesBySourceProvider(provider: String)
 }
