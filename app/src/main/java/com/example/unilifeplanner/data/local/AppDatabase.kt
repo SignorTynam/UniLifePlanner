@@ -223,7 +223,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     db.execSQL(
                         "UPDATE lessons SET dateMillis = ? WHERE id = ?",
-                        arrayOf(dateMillis, lessonId)
+                        arrayOf<Any?>(dateMillis, lessonId)
                     )
                 }
             }
