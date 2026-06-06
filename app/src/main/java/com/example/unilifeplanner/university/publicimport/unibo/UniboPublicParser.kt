@@ -1,5 +1,6 @@
 package com.example.unilifeplanner.university.publicimport.unibo
 
+import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicLesson
 import com.example.unilifeplanner.university.publicimport.PublicTeaching
@@ -43,16 +44,31 @@ class UniboPublicParser {
                 ?.absUrl("href")
     }
 
-    fun parseTeachingPlanLinks(
+    fun parseCurriculaOrTeachingPlans(
         html: String,
-        academicYear: String
-    ): List<String> {
+        academicYear: String,
+        degreeProgram: PublicDegreeProgram
+    ): List<PublicCurriculum> {
         val document = Jsoup.parse(html, UniboPublicConfig.COURSE_SITE_BASE_URL)
         val startYear = academicYear.substringBefore("/").trim()
         return document.select(TEACHING_PLAN_LINK_SELECTOR)
-            .map { it.absUrl("href") }
-            .filter { link -> startYear.isBlank() || link.contains("/$startYear/") }
-            .distinct()
+            .map { link -> link to link.absUrl("href").normalizeOfficialUrl() }
+            .filter { (_, url) -> startYear.isBlank() || url.contains("/$startYear/") }
+            .distinctBy { (_, url) -> url }
+            .mapIndexed { index, (link, url) ->
+                PublicCurriculum(
+                    externalId = buildStableExternalId(
+                        UniboPublicConfig.PROVIDER,
+                        degreeProgram.externalId,
+                        academicYear,
+                        url
+                    ),
+                    name = link.curriculumName(index),
+                    academicYear = academicYear,
+                    degreeProgramExternalId = degreeProgram.externalId,
+                    officialUrl = url
+                )
+            }
     }
 
     fun parseTeachingsFromDegreeProgramPage(
@@ -298,6 +314,38 @@ class UniboPublicParser {
 
     private fun String?.cleanOrNull(): String? =
         this?.trim()?.takeIf { it.isNotEmpty() }
+
+    private fun String.normalizeOfficialUrl(): String =
+        trim()
+            .substringBefore("#")
+            .trimEnd('/')
+
+    private fun Element.curriculumName(index: Int): String {
+        val ownText = text().cleanOrNull()
+            ?.takeUnless { it.isGenericTeachingPlanLabel() }
+        if (ownText != null) return ownText
+
+        val parentText = parents()
+            .take(3)
+            .mapNotNull { parent -> parent.text().cleanOrNull() }
+            .firstOrNull { text ->
+                val normalized = normalizeText(text)
+                normalized.length in 4..120 &&
+                    !normalized.isGenericTeachingPlanLabel() &&
+                    !normalized.contains("insegnamenti")
+            }
+
+        return parentText ?: "Curriculum ${index + 1}"
+    }
+
+    private fun String.isGenericTeachingPlanLabel(): Boolean {
+        val normalized = normalizeText(this)
+        return normalized.isBlank() ||
+            normalized == "piano didattico" ||
+            normalized == "insegnamenti" ||
+            normalized == "vedi il piano didattico" ||
+            normalized == "consulta il piano didattico"
+    }
 
     companion object {
         private const val DEGREE_RESULT_SELECTOR = "div.item"

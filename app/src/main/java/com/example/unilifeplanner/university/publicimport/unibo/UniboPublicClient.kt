@@ -20,25 +20,22 @@ class UniboPublicClient(
 ) {
     private val httpClient = client ?: defaultClient()
 
-    suspend fun searchDegreeProgramsPages(
-        query: String,
+    suspend fun loadDegreeProgramsPages(
         campus: String?,
         degreeType: String?
     ): List<String> {
         return degreeSearchUrls(
-            query = query,
+            query = null,
             campus = campus,
             degreeType = degreeType
         ).map { url -> fetch(url) }
     }
 
-    suspend fun searchDegreeProgramsPage(
-        query: String,
+    suspend fun loadDegreeProgramsPage(
         campus: String?,
         degreeType: String?
     ): String {
-        return searchDegreeProgramsPages(
-            query = query,
+        return loadDegreeProgramsPages(
             campus = campus,
             degreeType = degreeType
         ).joinToString(separator = "\n")
@@ -110,7 +107,7 @@ class UniboPublicClient(
     }
 
     private fun degreeSearchUrls(
-        query: String,
+        query: String?,
         campus: String?,
         degreeType: String?
     ): List<HttpUrl> {
@@ -145,8 +142,10 @@ class UniboPublicClient(
                 .newBuilder()
                 .encodedPath(request.path)
                 .addQueryParameter("orderby", "alphabetic")
-                .addQueryParameter("fulltext", query)
                 .apply {
+                    query?.takeIf { it.isNotBlank() }?.let {
+                        addQueryParameter("fulltext", it)
+                    }
                     campus?.takeIf { it.isNotBlank() }?.let { addQueryParameter("sede", it) }
                     request.duration?.let { addQueryParameter("durata", it) }
                 }

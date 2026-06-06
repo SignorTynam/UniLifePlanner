@@ -9,16 +9,27 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -35,6 +46,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showClearPlannerDataDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -92,7 +104,104 @@ fun SettingsScreen(
                     supportingContent = { Text(text = "Gestione disponibile nella sezione corsi") }
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Dati applicazione",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ListItem(
+                    modifier = Modifier.clickable(
+                        enabled = !uiState.isClearingPlannerData,
+                        onClick = {
+                            viewModel.clearPlannerDataFeedback()
+                            showClearPlannerDataDialog = true
+                        }
+                    ),
+                    leadingContent = {
+                        if (uiState.isClearingPlannerData) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    headlineContent = {
+                        Text(
+                            text = if (uiState.isClearingPlannerData) {
+                                "Cancellazione in corso..."
+                            } else {
+                                "Cancella dati del planner"
+                            },
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = "Elimina corsi, lezioni, esami, preferiti e dati importati. Non elimina account, profilo, email o tema."
+                        )
+                    }
+                )
+            }
+
+            uiState.clearPlannerDataMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            uiState.clearPlannerDataError?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
+    }
+
+    if (showClearPlannerDataDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!uiState.isClearingPlannerData) {
+                    showClearPlannerDataDialog = false
+                }
+            },
+            title = { Text(text = "Cancellare i dati del planner?") },
+            text = {
+                Text(
+                    text = "Questa azione eliminerà corsi, lezioni, esami, preferiti e dati importati. Account, profilo e impostazioni personali resteranno invariati. L'azione non può essere annullata."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearPlannerDataDialog = false
+                        viewModel.clearPlannerData()
+                    },
+                    enabled = !uiState.isClearingPlannerData
+                ) {
+                    Text(text = "Cancella dati")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showClearPlannerDataDialog = false },
+                    enabled = !uiState.isClearingPlannerData
+                ) {
+                    Text(text = "Annulla")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            titleContentColor = MaterialTheme.colorScheme.onErrorContainer,
+            textContentColor = MaterialTheme.colorScheme.onErrorContainer
+        )
     }
 }
 

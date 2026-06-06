@@ -2,8 +2,11 @@ package com.example.unilifeplanner.university.publicimport
 
 enum class PublicImportStatus {
     Idle,
-    Loading,
-    Results,
+    LoadingDegreePrograms,
+    DegreeProgramsLoaded,
+    LoadingCurricula,
+    CurriculumSelection,
+    LoadingPreview,
     Preview,
     Importing,
     Imported,

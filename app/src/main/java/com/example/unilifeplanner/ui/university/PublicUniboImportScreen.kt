@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,7 +28,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +46,7 @@ import com.example.unilifeplanner.ui.components.InfoPill
 import com.example.unilifeplanner.ui.components.UniLifeCard
 import com.example.unilifeplanner.ui.components.UniLifeScreenContainer
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
+import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
@@ -68,9 +67,9 @@ fun PublicUniboImportScreen(
         onAcademicYearChange = viewModel::updateAcademicYear,
         onCampusChange = viewModel::updateCampus,
         onDegreeTypeChange = viewModel::updateDegreeType,
-        onQueryChange = viewModel::updateQuery,
-        onSearchClick = viewModel::searchDegreePrograms,
+        onLoadDegreeProgramsClick = viewModel::loadDegreePrograms,
         onDegreeProgramClick = viewModel::selectDegreeProgram,
+        onCurriculumClick = viewModel::selectCurriculum,
         onImportClick = viewModel::importPreview,
         onGoToCoursesClick = onGoToCoursesClick,
         onImportAnotherClick = viewModel::resetForAnotherImport
@@ -84,9 +83,9 @@ private fun PublicUniboImportContent(
     onAcademicYearChange: (String) -> Unit,
     onCampusChange: (String) -> Unit,
     onDegreeTypeChange: (String) -> Unit,
-    onQueryChange: (String) -> Unit,
-    onSearchClick: () -> Unit,
+    onLoadDegreeProgramsClick: () -> Unit,
     onDegreeProgramClick: (PublicDegreeProgram) -> Unit,
+    onCurriculumClick: (PublicCurriculum) -> Unit,
     onImportClick: () -> Unit,
     onGoToCoursesClick: () -> Unit,
     onImportAnotherClick: () -> Unit
@@ -114,24 +113,37 @@ private fun PublicUniboImportContent(
                 onAcademicYearChange = onAcademicYearChange,
                 onCampusChange = onCampusChange,
                 onDegreeTypeChange = onDegreeTypeChange,
-                onQueryChange = onQueryChange,
-                onSearchClick = onSearchClick
+                onLoadDegreeProgramsClick = onLoadDegreeProgramsClick
             )
 
             when (uiState.status) {
                 PublicImportStatus.Idle -> Unit
-                PublicImportStatus.Loading -> LoadingCard(
-                    text = if (uiState.selectedDegreeProgram == null) {
-                        "Ricerca corso di laurea in corso..."
-                    } else {
-                        "Caricamento anteprima import..."
-                    }
+                PublicImportStatus.LoadingDegreePrograms -> LoadingCard(
+                    text = "Caricamento corsi di laurea..."
                 )
-                PublicImportStatus.Results -> ResultsSection(
+                PublicImportStatus.DegreeProgramsLoaded -> ResultsSection(
                     results = uiState.results,
                     onDegreeProgramClick = onDegreeProgramClick
                 )
+                PublicImportStatus.LoadingCurricula -> {
+                    uiState.selectedDegreeProgram?.let { SelectedDegreeProgramCard(it) }
+                    LoadingCard(text = "Verifica curriculum disponibili...")
+                }
+                PublicImportStatus.CurriculumSelection -> {
+                    uiState.selectedDegreeProgram?.let { SelectedDegreeProgramCard(it) }
+                    CurriculumSection(
+                        curricula = uiState.curricula,
+                        onCurriculumClick = onCurriculumClick
+                    )
+                }
+                PublicImportStatus.LoadingPreview -> {
+                    uiState.selectedDegreeProgram?.let { SelectedDegreeProgramCard(it) }
+                    uiState.selectedCurriculum?.let { SelectedCurriculumCard(it) }
+                    LoadingCard(text = "Caricamento anteprima import...")
+                }
                 PublicImportStatus.Preview -> uiState.preview?.let { preview ->
+                    SelectedDegreeProgramCard(preview.degreeProgram)
+                    preview.curriculum?.let { SelectedCurriculumCard(it) }
                     PreviewSection(
                         preview = preview,
                         onImportClick = onImportClick
@@ -167,24 +179,12 @@ private fun HeaderSection() {
             tint = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Importa corsi da Universita di Bologna",
+            text = "Importa corsi dall'Università di Bologna",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Importa insegnamenti e lezioni pubbliche dell'Universita di Bologna senza collegare l'account studente.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-    UniLifeCard {
-        Icon(
-            imageVector = Icons.Filled.Info,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Questa funzione usa solo dati pubblici disponibili sul sito UniBo. Non richiede username, password o accesso all'area riservata.",
+            text = "Importa insegnamenti e lezioni pubbliche dell'Università di Bologna senza collegare l'account studente.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -197,8 +197,7 @@ private fun SearchForm(
     onAcademicYearChange: (String) -> Unit,
     onCampusChange: (String) -> Unit,
     onDegreeTypeChange: (String) -> Unit,
-    onQueryChange: (String) -> Unit,
-    onSearchClick: () -> Unit
+    onLoadDegreeProgramsClick: () -> Unit
 ) {
     UniLifeCard {
         SelectionField(
@@ -219,20 +218,8 @@ private fun SearchForm(
             options = uiState.degreeTypes,
             onSelected = onDegreeTypeChange
         )
-        OutlinedTextField(
-            value = uiState.query,
-            onValueChange = onQueryChange,
-            label = { Text(text = "Nome corso di laurea") },
-            placeholder = { Text(text = "Es. Ingegneria e Scienze Informatiche") },
-            singleLine = true,
-            isError = uiState.queryError != null,
-            supportingText = {
-                uiState.queryError?.let { Text(text = it) }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
         Button(
-            onClick = onSearchClick,
+            onClick = onLoadDegreeProgramsClick,
             enabled = !uiState.isBusy,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -241,7 +228,7 @@ private fun SearchForm(
                 contentDescription = null
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "Cerca corso di laurea")
+            Text(text = "Carica corsi di laurea")
         }
     }
 }
@@ -299,14 +286,14 @@ private fun ResultsSection(
     onDegreeProgramClick: (PublicDegreeProgram) -> Unit
 ) {
     Text(
-        text = "Risultati",
+        text = "Scegli corso di laurea",
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.SemiBold
     )
     if (results.isEmpty()) {
         UniLifeCard {
             Text(
-                text = "Nessun corso di laurea trovato. Prova con un nome piu generico.",
+                text = "Nessun corso di laurea trovato per i filtri selezionati.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -318,6 +305,84 @@ private fun ResultsSection(
         DegreeProgramResultCard(
             degreeProgram = degreeProgram,
             onClick = { onDegreeProgramClick(degreeProgram) }
+        )
+    }
+}
+
+@Composable
+private fun SelectedDegreeProgramCard(degreeProgram: PublicDegreeProgram) {
+    UniLifeCard {
+        Text(
+            text = "Corso selezionato",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = degreeProgram.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun CurriculumSection(
+    curricula: List<PublicCurriculum>,
+    onCurriculumClick: (PublicCurriculum) -> Unit
+) {
+    Text(
+        text = "Scegli curriculum",
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.SemiBold
+    )
+    curricula.forEach { curriculum ->
+        UniLifeCard {
+            Text(
+                text = curriculum.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            InfoPill(text = curriculum.academicYear)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = curriculum.officialUrl,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Button(
+                onClick = { onCurriculumClick(curriculum) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Seleziona curriculum")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectedCurriculumCard(curriculum: PublicCurriculum) {
+    UniLifeCard {
+        Text(
+            text = "Curriculum selezionato",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = curriculum.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -385,6 +450,9 @@ private fun PreviewSection(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
+        preview.curriculum?.let { curriculum ->
+            Text(text = "Curriculum: ${curriculum.name}")
+        }
         Text(text = "${preview.teachings.size} insegnamenti trovati")
         Text(text = "${preview.lessons.size} lezioni trovate")
         Text(text = "${preview.warnings.size} avvisi")

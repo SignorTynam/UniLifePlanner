@@ -1,5 +1,6 @@
 package com.example.unilifeplanner.ui.university
 
+import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
@@ -17,15 +18,17 @@ data class PublicUniboImportUiState(
     val selectedAcademicYear: String = "2025/2026",
     val selectedCampus: String = "Tutti",
     val selectedDegreeType: String = "Tutte",
-    val query: String = "",
-    val queryError: String? = null,
     val status: PublicImportStatus = PublicImportStatus.Idle,
     val results: List<PublicDegreeProgram> = emptyList(),
     val selectedDegreeProgram: PublicDegreeProgram? = null,
+    val curricula: List<PublicCurriculum> = emptyList(),
+    val selectedCurriculum: PublicCurriculum? = null,
     val preview: PublicImportPreview? = null,
     val importResult: PublicImportResult? = null,
     val errorMessage: String? = null
 ) {
-    val isBusy: Boolean =
-        status == PublicImportStatus.Loading || status == PublicImportStatus.Importing
+    val isBusy: Boolean = status == PublicImportStatus.LoadingDegreePrograms ||
+        status == PublicImportStatus.LoadingCurricula ||
+        status == PublicImportStatus.LoadingPreview ||
+        status == PublicImportStatus.Importing
 }

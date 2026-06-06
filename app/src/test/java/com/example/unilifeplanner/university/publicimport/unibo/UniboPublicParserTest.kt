@@ -45,6 +45,40 @@ class UniboPublicParserTest {
     }
 
     @Test
+    fun parseCurriculaOrTeachingPlans_readsOfficialPlanLinks() {
+        val degreeProgram = PublicDegreeProgram(
+            externalId = "6673",
+            name = "Ingegneria e scienze informatiche",
+            campus = "Cesena",
+            degreeType = "Laurea",
+            academicYear = "2025/2026",
+            officialUrl = "https://corsi.unibo.it/laurea/IngegneriaScienzeInformatiche"
+        )
+        val html = """
+            <!doctype html>
+            <html>
+            <body>
+                <a href="/laurea/IngegneriaScienzeInformatiche/insegnamenti/piano/2025/6673/000/000">Piano didattico - Informatica</a>
+                <a href="/laurea/IngegneriaScienzeInformatiche/insegnamenti/piano/2025/6673/000/000#top">Duplicato</a>
+                <a href="/laurea/IngegneriaScienzeInformatiche/insegnamenti/piano/2024/6673/000/000">Vecchio anno</a>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val curricula = parser.parseCurriculaOrTeachingPlans(
+            html = html,
+            academicYear = "2025/2026",
+            degreeProgram = degreeProgram
+        )
+
+        assertEquals(1, curricula.size)
+        assertEquals("Piano didattico - Informatica", curricula.first().name)
+        assertEquals("6673", curricula.first().degreeProgramExternalId)
+        assertEquals("2025/2026", curricula.first().academicYear)
+        assertTrue(curricula.first().externalId.isNotBlank())
+    }
+
+    @Test
     fun parseIncompleteHtml_doesNotCrash() {
         val results = parser.parseDegreeProgramSearchResults(fixture("unibo/incomplete.html"))
         val teachings = parser.parseTeachingsFromDegreeProgramPage(

@@ -124,6 +124,9 @@ interface LessonDao {
     @Query("DELETE FROM lessons WHERE courseId = :courseId")
     suspend fun deleteLessonsForCourse(courseId: Int)
 
+    @Query("DELETE FROM lessons")
+    suspend fun deleteAllLessons()
+
     @Query("SELECT * FROM lessons WHERE sourceProvider = :provider")
     suspend fun getLessonsBySourceProvider(provider: String): List<LessonEntity>
 

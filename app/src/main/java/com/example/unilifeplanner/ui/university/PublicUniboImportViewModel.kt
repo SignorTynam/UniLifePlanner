@@ -7,6 +7,7 @@ import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
+import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicImportStatus
 import com.example.unilifeplanner.university.publicimport.unibo.UniboPublicImportException
@@ -34,47 +35,27 @@ class PublicUniboImportViewModel(
     val uiState: StateFlow<PublicUniboImportUiState> = _uiState.asStateFlow()
 
     fun updateAcademicYear(value: String) {
-        _uiState.update { it.copy(selectedAcademicYear = value, errorMessage = null) }
+        _uiState.update { it.resetSelection().copy(selectedAcademicYear = value) }
     }
 
     fun updateCampus(value: String) {
-        _uiState.update { it.copy(selectedCampus = value, errorMessage = null) }
+        _uiState.update { it.resetSelection().copy(selectedCampus = value) }
     }
 
     fun updateDegreeType(value: String) {
-        _uiState.update { it.copy(selectedDegreeType = value, errorMessage = null) }
+        _uiState.update { it.resetSelection().copy(selectedDegreeType = value) }
     }
 
-    fun updateQuery(value: String) {
-        _uiState.update {
-            it.copy(
-                query = value,
-                queryError = null,
-                errorMessage = null
-            )
-        }
-    }
-
-    fun searchDegreePrograms() {
+    fun loadDegreePrograms() {
         val state = _uiState.value
-        val query = state.query.trim()
-        if (query.length < 3) {
-            _uiState.update {
-                it.copy(
-                    queryError = "Inserisci almeno 3 caratteri",
-                    errorMessage = null,
-                    status = PublicImportStatus.Idle
-                )
-            }
-            return
-        }
-
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
-                    status = PublicImportStatus.Loading,
+                    status = PublicImportStatus.LoadingDegreePrograms,
                     results = emptyList(),
                     selectedDegreeProgram = null,
+                    curricula = emptyList(),
+                    selectedCurriculum = null,
                     preview = null,
                     importResult = null,
                     errorMessage = null
@@ -82,15 +63,14 @@ class PublicUniboImportViewModel(
             }
 
             try {
-                val results = repository.searchDegreePrograms(
-                    query = query,
+                val results = repository.loadDegreePrograms(
                     academicYear = state.selectedAcademicYear,
                     campus = state.selectedCampus,
                     degreeType = state.selectedDegreeType
                 )
                 _uiState.update {
                     it.copy(
-                        status = PublicImportStatus.Results,
+                        status = PublicImportStatus.DegreeProgramsLoaded,
                         results = results,
                         errorMessage = null
                     )
@@ -110,8 +90,10 @@ class PublicUniboImportViewModel(
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
-                    status = PublicImportStatus.Loading,
+                    status = PublicImportStatus.LoadingCurricula,
                     selectedDegreeProgram = degreeProgram,
+                    curricula = emptyList(),
+                    selectedCurriculum = null,
                     preview = null,
                     importResult = null,
                     errorMessage = null
@@ -119,14 +101,53 @@ class PublicUniboImportViewModel(
             }
 
             try {
-                val preview = repository.loadPreview(degreeProgram)
-                _uiState.update {
-                    it.copy(
-                        status = PublicImportStatus.Preview,
-                        preview = preview,
-                        errorMessage = null
+                val curricula = repository.loadCurricula(degreeProgram)
+                if (curricula.size > 1) {
+                    _uiState.update {
+                        it.copy(
+                            status = PublicImportStatus.CurriculumSelection,
+                            curricula = curricula,
+                            errorMessage = null
+                        )
+                    }
+                } else {
+                    val curriculum = curricula.singleOrNull()
+                    loadPreviewFor(
+                        degreeProgram = degreeProgram,
+                        curriculum = curriculum,
+                        knownCurricula = curricula
                     )
                 }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        status = PublicImportStatus.Error,
+                        errorMessage = exception.toUserMessage()
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectCurriculum(curriculum: PublicCurriculum) {
+        val degreeProgram = _uiState.value.selectedDegreeProgram ?: return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    status = PublicImportStatus.LoadingPreview,
+                    selectedCurriculum = curriculum,
+                    preview = null,
+                    importResult = null,
+                    errorMessage = null
+                )
+            }
+
+            try {
+                loadPreviewFor(
+                    degreeProgram = degreeProgram,
+                    curriculum = curriculum,
+                    knownCurricula = _uiState.value.curricula
+                )
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
@@ -183,5 +204,47 @@ class PublicUniboImportViewModel(
             is UniboPublicImportException -> message ?: "Import UniBo non riuscito"
             else -> message ?: "Import UniBo non riuscito"
         }
+    }
+
+    private suspend fun loadPreviewFor(
+        degreeProgram: PublicDegreeProgram,
+        curriculum: PublicCurriculum?,
+        knownCurricula: List<PublicCurriculum>
+    ) {
+        _uiState.update {
+            it.copy(
+                status = PublicImportStatus.LoadingPreview,
+                selectedDegreeProgram = degreeProgram,
+                curricula = knownCurricula,
+                selectedCurriculum = curriculum,
+                preview = null,
+                importResult = null,
+                errorMessage = null
+            )
+        }
+        val preview = repository.loadPreview(
+            degreeProgram = degreeProgram,
+            curriculum = curriculum
+        )
+        _uiState.update {
+            it.copy(
+                status = PublicImportStatus.Preview,
+                preview = preview,
+                errorMessage = null
+            )
+        }
+    }
+
+    private fun PublicUniboImportUiState.resetSelection(): PublicUniboImportUiState {
+        return copy(
+            status = PublicImportStatus.Idle,
+            results = emptyList(),
+            selectedDegreeProgram = null,
+            curricula = emptyList(),
+            selectedCurriculum = null,
+            preview = null,
+            importResult = null,
+            errorMessage = null
+        )
     }
 }

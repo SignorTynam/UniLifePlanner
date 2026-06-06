@@ -9,10 +9,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.example.unilifeplanner" />
-                  <option name="mobileSdkAppId" value="1:832793680867:android:1eb485a500bb3b2f705ed6" />
-                  <option name="projectId" value="unilife-planner-94ed8" />
-                  <option name="projectNumber" value="832793680867" />
+                  <option name="appId" value="PLACEHOLDER" />
+                  <option name="mobileSdkAppId" value="" />
+                  <option name="projectId" value="" />
+                  <option name="projectNumber" value="" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

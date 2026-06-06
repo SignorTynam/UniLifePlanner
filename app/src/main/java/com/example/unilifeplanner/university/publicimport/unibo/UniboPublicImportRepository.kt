@@ -1,5 +1,6 @@
 package com.example.unilifeplanner.university.publicimport.unibo
 
+import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
@@ -18,8 +19,7 @@ class UniboPublicImportRepository(
 ) : PublicUniversityProvider {
     override val provider: String = UniboPublicConfig.PROVIDER
 
-    override suspend fun searchDegreePrograms(
-        query: String,
+    override suspend fun loadDegreePrograms(
         academicYear: String,
         campus: String?,
         degreeType: String?
@@ -27,7 +27,6 @@ class UniboPublicImportRepository(
         val normalizedCampus = campus.toCampusParam()
         val normalizedDegreeType = degreeType?.takeUnless { normalizeText(it) == "tutte" }
         val key = listOf(
-            normalizeText(query),
             academicYear,
             normalizedCampus.orEmpty(),
             normalizedDegreeType.orEmpty()
@@ -35,8 +34,7 @@ class UniboPublicImportRepository(
 
         cache.getSearch(key)?.let { return it }
 
-        val results = client.searchDegreeProgramsPages(
-            query = query,
+        val results = client.loadDegreeProgramsPages(
             campus = normalizedCampus,
             degreeType = normalizedDegreeType
         )
@@ -48,8 +46,37 @@ class UniboPublicImportRepository(
         return results
     }
 
-    override suspend fun loadPreview(degreeProgram: PublicDegreeProgram): PublicImportPreview {
+    override suspend fun loadCurricula(degreeProgram: PublicDegreeProgram): List<PublicCurriculum> {
         val cacheKey = "${degreeProgram.externalId}|${degreeProgram.academicYear}"
+        cache.getCurricula(cacheKey)?.let { return it }
+
+        val detailHtml = client.getDegreeProgramPage(degreeProgram.officialUrl)
+        val siteUrl = parser.parseDegreeProgramSiteUrl(detailHtml) ?: return emptyList()
+        val baseDegreeProgram = degreeProgram.copy(officialUrl = siteUrl)
+        val indexHtml = client.getTeachingPlanIndexPage(
+            degreeProgramSiteUrl = siteUrl,
+            academicYear = degreeProgram.academicYear,
+            degreeProgramCode = degreeProgram.externalId
+        )
+        val curricula = parser.parseCurriculaOrTeachingPlans(
+            html = indexHtml,
+            academicYear = degreeProgram.academicYear,
+            degreeProgram = baseDegreeProgram
+        )
+
+        cache.putCurricula(cacheKey, curricula)
+        return curricula
+    }
+
+    override suspend fun loadPreview(
+        degreeProgram: PublicDegreeProgram,
+        curriculum: PublicCurriculum?
+    ): PublicImportPreview {
+        val cacheKey = listOf(
+            degreeProgram.externalId,
+            degreeProgram.academicYear,
+            curriculum?.externalId.orEmpty()
+        ).joinToString("|")
         cache.getPreview(cacheKey)?.let { return it }
 
         val warnings = mutableListOf<String>()
@@ -60,23 +87,32 @@ class UniboPublicImportRepository(
                 degreeProgram = degreeProgram,
                 teachings = emptyList(),
                 lessons = emptyList(),
-                warnings = listOf("Pagina pubblica del corso di laurea non trovata.")
+                warnings = listOf("Pagina pubblica del corso di laurea non trovata."),
+                curriculum = curriculum
             )
             cache.putPreview(cacheKey, preview)
             return preview
         }
 
-        val indexHtml = client.getTeachingPlanIndexPage(
-            degreeProgramSiteUrl = siteUrl,
-            academicYear = degreeProgram.academicYear,
-            degreeProgramCode = degreeProgram.externalId
-        )
-        val planLinks = parser.parseTeachingPlanLinks(indexHtml, degreeProgram.academicYear)
+        val baseDegreeProgram = degreeProgram.copy(officialUrl = siteUrl)
+        val planLinks = if (curriculum != null) {
+            listOf(curriculum.officialUrl)
+        } else {
+            val indexHtml = client.getTeachingPlanIndexPage(
+                degreeProgramSiteUrl = siteUrl,
+                academicYear = degreeProgram.academicYear,
+                degreeProgramCode = degreeProgram.externalId
+            )
+            parser.parseCurriculaOrTeachingPlans(
+                html = indexHtml,
+                academicYear = degreeProgram.academicYear,
+                degreeProgram = baseDegreeProgram
+            ).map { it.officialUrl }
+        }
         if (planLinks.isEmpty()) {
             warnings += "Nessun piano didattico pubblico trovato per ${degreeProgram.academicYear}."
         }
 
-        val baseDegreeProgram = degreeProgram.copy(officialUrl = siteUrl)
         val planTeachings = planLinks
             .flatMap { planUrl ->
                 val planHtml = client.getDegreeProgramPage(planUrl)
@@ -120,7 +156,8 @@ class UniboPublicImportRepository(
             degreeProgram = baseDegreeProgram,
             teachings = enrichedTeachings,
             lessons = lessons.distinctBy { it.externalId },
-            warnings = warnings.distinct()
+            warnings = warnings.distinct(),
+            curriculum = curriculum
         )
         cache.putPreview(cacheKey, preview)
         return preview

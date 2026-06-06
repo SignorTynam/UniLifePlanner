@@ -99,6 +99,9 @@ interface ExamAppealDao {
     @Query("DELETE FROM exam_appeals WHERE courseId = :courseId")
     suspend fun deleteExamAppealsForCourse(courseId: Int)
 
+    @Query("DELETE FROM exam_appeals")
+    suspend fun deleteAllExamAppeals()
+
     @Transaction
     suspend fun upsertImportedExamAppeal(
         source: String,
