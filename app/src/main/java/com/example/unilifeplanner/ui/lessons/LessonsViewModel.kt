@@ -12,6 +12,8 @@ import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.domain.lessons.isAlreadyPassedThisWeek
 import com.example.unilifeplanner.domain.lessons.lessonStartMillis
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
+import com.example.unilifeplanner.university.refresh.UniboRefreshManager
+import com.example.unilifeplanner.university.refresh.UniboRefreshSource
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -30,6 +32,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
     private val lessonRepository = LessonRepository(database.lessonDao())
     private val courseRepository = CourseRepository(database.courseDao())
     private val lessonReminderScheduler = LessonReminderScheduler(application.applicationContext)
+    private val uniboRefreshManager = UniboRefreshManager(application.applicationContext)
 
     private val _searchQuery = MutableStateFlow("")
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
@@ -38,6 +41,8 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
     private val _showPastThisWeek = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(true)
+    private val _isRefreshing = MutableStateFlow(false)
+    private val _refreshMessage = MutableStateFlow<String?>(null)
 
     private var hasAppliedInitialCourse = false
 
@@ -60,24 +65,37 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    private val refreshStateFlow = combine(
+        _isRefreshing,
+        _refreshMessage
+    ) { isRefreshing, refreshMessage ->
+        RefreshState(
+            isRefreshing = isRefreshing,
+            refreshMessage = refreshMessage
+        )
+    }
+
     val uiState: StateFlow<LessonsUiState> = combine(
         lessonsFlow,
         filterStateFlow,
         _isLoading,
-        _errorMessage
-    ) { lessons, filters, isLoading, errorMessage ->
+        _errorMessage,
+        refreshStateFlow
+    ) { lessons, filters, isLoading, errorMessage, refreshState ->
         val nowMillis = System.currentTimeMillis()
         val availableCourses = lessons
             .map { LessonCourseFilterUi(it.lesson.courseId, it.courseName) }
             .distinctBy { it.courseId }
             .sortedBy { it.courseName.lowercase() }
-        val selectedCourseName = filters.selectedCourseId?.let { courseId ->
+        val effectiveSelectedCourseId = filters.selectedCourseId
+            ?.takeIf { id -> availableCourses.any { it.courseId == id } }
+        val selectedCourseName = effectiveSelectedCourseId?.let { courseId ->
             availableCourses.firstOrNull { it.courseId == courseId }?.courseName
         }
 
         val filteredLessons = lessons
             .filter { matchesSearch(it, filters.searchQuery) }
-            .filter { filters.selectedCourseId == null || it.lesson.courseId == filters.selectedCourseId }
+            .filter { effectiveSelectedCourseId == null || it.lesson.courseId == effectiveSelectedCourseId }
             .filter { matchesDateFilter(it, filters.dateFilter, nowMillis) }
 
         val lessonItems = filteredLessons.map { it.toLessonListItemUi(nowMillis) }
@@ -87,7 +105,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             isLoading = isLoading,
             errorMessage = errorMessage,
             searchQuery = filters.searchQuery,
-            selectedCourseId = filters.selectedCourseId,
+            selectedCourseId = effectiveSelectedCourseId,
             selectedCourseName = selectedCourseName,
             selectedDateFilter = filters.dateFilter,
             selectedSortOption = filters.sortOption,
@@ -95,7 +113,9 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             upcomingLessons = sortLessons(upcoming, filters.sortOption),
             pastThisWeekLessons = sortPastLessons(pastThisWeek),
             showPastThisWeek = filters.showPast,
-            hasAnyLessons = lessons.isNotEmpty()
+            hasAnyLessons = lessons.isNotEmpty(),
+            isRefreshing = refreshState.isRefreshing,
+            refreshMessage = refreshState.refreshMessage
         )
     }.stateIn(
         scope = viewModelScope,
@@ -184,6 +204,26 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    fun refreshUniboData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                _refreshMessage.value = uniboRefreshManager.refreshImportedUniboData(
+                    source = UniboRefreshSource.MANUAL,
+                    force = true
+                ).message
+            } catch (exception: Exception) {
+                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova piu tardi."
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun clearRefreshMessage() {
+        _refreshMessage.value = null
     }
 
     private fun matchesSearch(lesson: LessonWithCourse, query: String): Boolean {
@@ -315,4 +355,9 @@ private data class LessonFilterState(
     val dateFilter: LessonDateFilter,
     val sortOption: LessonSortOption,
     val showPast: Boolean
+)
+
+private data class RefreshState(
+    val isRefreshing: Boolean,
+    val refreshMessage: String?
 )

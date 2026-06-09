@@ -46,6 +46,7 @@ class AddEditExamViewModel(application: Application) : AndroidViewModel(applicat
 
             try {
                 val courses = courseRepository.allCourses.first()
+                    .filter { it.status != com.example.unilifeplanner.domain.model.CourseStatus.COMPLETED.name }
                     .map { course -> ExamCourseOptionUi(course.id, course.name) }
                     .sortedBy { it.courseName.lowercase() }
 
@@ -216,6 +217,13 @@ class AddEditExamViewModel(application: Application) : AndroidViewModel(applicat
                     source = existing?.source ?: ExamAppealSource.MANUAL.name,
                     externalId = existing?.externalId,
                     officialUrl = existing?.officialUrl,
+                    feedbackStatus = existing?.feedbackStatus
+                        ?: com.example.unilifeplanner.domain.exams.ExamFeedbackStatus.NOT_REQUESTED.name,
+                    feedbackResult = existing?.feedbackResult,
+                    feedbackGrade = existing?.feedbackGrade,
+                    feedbackNotes = existing?.feedbackNotes,
+                    feedbackAskedAtMillis = existing?.feedbackAskedAtMillis,
+                    feedbackAnsweredAtMillis = existing?.feedbackAnsweredAtMillis,
                     createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 )
@@ -254,6 +262,7 @@ class AddEditExamViewModel(application: Application) : AndroidViewModel(applicat
                         timeMinutes = parsedTime,
                         reminderDateTimeMillis = existing?.reminderDateTimeMillis
                     )
+                    examAppealRepository.markFeedbackScheduled(savedExamAppealId)
                 } else {
                     examReminderScheduler.cancelExamAppealReminders(savedExamAppealId)
                 }

@@ -12,6 +12,8 @@ import com.example.unilifeplanner.domain.exams.examStartMillis
 import com.example.unilifeplanner.domain.exams.formatExamDate
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.notifications.ExamReminderScheduler
+import com.example.unilifeplanner.university.refresh.UniboRefreshManager
+import com.example.unilifeplanner.university.refresh.UniboRefreshSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -27,25 +29,41 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
     private val examAppealRepository = ExamAppealRepository(database.examAppealDao())
     private val courseRepository = CourseRepository(database.courseDao())
     private val examReminderScheduler = ExamReminderScheduler(application.applicationContext)
+    private val uniboRefreshManager = UniboRefreshManager(application.applicationContext)
 
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
     private val _showPastExams = MutableStateFlow(false)
     private val _isLoading = MutableStateFlow(true)
     private val _errorMessage = MutableStateFlow<String?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
+    private val _refreshMessage = MutableStateFlow<String?>(null)
 
     private var hasAppliedInitialCourse = false
+
+    private val refreshStateFlow = combine(
+        _isRefreshing,
+        _refreshMessage
+    ) { isRefreshing, refreshMessage ->
+        ExamRefreshState(
+            isRefreshing = isRefreshing,
+            refreshMessage = refreshMessage
+        )
+    }
 
     private val controlsFlow = combine(
         _selectedCourseId,
         _showPastExams,
         _isLoading,
-        _errorMessage
-    ) { selectedCourseId, showPast, isLoading, errorMessage ->
+        _errorMessage,
+        refreshStateFlow
+    ) { selectedCourseId, showPast, isLoading, errorMessage, refreshState ->
         ExamControls(
             selectedCourseId = selectedCourseId,
             showPast = showPast,
             isLoading = isLoading,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            isRefreshing = refreshState.isRefreshing,
+            refreshMessage = refreshState.refreshMessage
         )
     }
 
@@ -59,10 +77,13 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         controlsFlow
     ) { exams, courses, controls ->
         val availableCourses = courses
+            .filter { it.status != com.example.unilifeplanner.domain.model.CourseStatus.COMPLETED.name }
             .map { course -> ExamCourseOptionUi(course.id, course.name) }
             .sortedBy { it.courseName.lowercase() }
+        val effectiveSelectedCourseId = controls.selectedCourseId
+            ?.takeIf { id -> availableCourses.any { it.courseId == id } }
         val filteredExams = exams.filter { exam ->
-            controls.selectedCourseId == null || exam.exam.courseId == controls.selectedCourseId
+            effectiveSelectedCourseId == null || exam.exam.courseId == effectiveSelectedCourseId
         }
         val now = System.currentTimeMillis()
         val items = filteredExams.map { exam -> exam.toListItem(now) }
@@ -76,15 +97,17 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         ExamsUiState(
             isLoading = controls.isLoading,
             errorMessage = controls.errorMessage,
-            selectedCourseId = controls.selectedCourseId,
-            selectedCourseName = controls.selectedCourseId?.let { id ->
+            selectedCourseId = effectiveSelectedCourseId,
+            selectedCourseName = effectiveSelectedCourseId?.let { id ->
                 availableCourses.firstOrNull { it.courseId == id }?.courseName
             },
             availableCourses = availableCourses,
             upcomingExams = upcoming,
             pastExams = past,
             showPastExams = controls.showPast,
-            hasAnyExams = exams.isNotEmpty()
+            hasAnyExams = exams.isNotEmpty(),
+            isRefreshing = controls.isRefreshing,
+            refreshMessage = controls.refreshMessage
         )
     }.stateIn(
         scope = viewModelScope,
@@ -149,10 +172,11 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
                         examAppealId = exam.id,
                         courseId = exam.courseId,
                         courseName = examWithCourse.courseName,
-                        examDateMillis = exam.dateMillis,
-                        timeMinutes = exam.timeMinutes,
-                        reminderDateTimeMillis = exam.reminderDateTimeMillis
-                    )
+                    examDateMillis = exam.dateMillis,
+                    timeMinutes = exam.timeMinutes,
+                    reminderDateTimeMillis = exam.reminderDateTimeMillis
+                )
+                    examAppealRepository.markFeedbackScheduled(exam.id)
                 } else {
                     examReminderScheduler.cancelExamAppealReminders(exam.id)
                 }
@@ -177,6 +201,26 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         _errorMessage.value = null
     }
 
+    fun refreshUniboData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                _refreshMessage.value = uniboRefreshManager.refreshImportedUniboData(
+                    source = UniboRefreshSource.MANUAL,
+                    force = true
+                ).message
+            } catch (exception: Exception) {
+                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova piu tardi."
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun clearRefreshMessage() {
+        _refreshMessage.value = null
+    }
+
     private fun ExamAppealWithCourse.toListItem(nowMillis: Long): ExamAppealListItemUi {
         val startMillis = examStartMillis(
             dateMillis = exam.dateMillis,
@@ -193,6 +237,9 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
             type = exam.type,
             reminderEnabled = exam.reminderEnabled,
             sourceLabel = sourceLabel(exam.source),
+            feedbackStatus = exam.feedbackStatus,
+            feedbackResult = exam.feedbackResult,
+            feedbackGrade = exam.feedbackGrade,
             startMillis = startMillis,
             isPast = startMillis < nowMillis
         )
@@ -210,5 +257,12 @@ private data class ExamControls(
     val selectedCourseId: Int?,
     val showPast: Boolean,
     val isLoading: Boolean,
-    val errorMessage: String?
+    val errorMessage: String?,
+    val isRefreshing: Boolean,
+    val refreshMessage: String?
+)
+
+private data class ExamRefreshState(
+    val isRefreshing: Boolean,
+    val refreshMessage: String?
 )

@@ -89,6 +89,7 @@ interface LessonDao {
         SELECT lessons.*, courses.name AS courseName, courses.professor AS courseProfessor
         FROM lessons
         INNER JOIN courses ON lessons.courseId = courses.id
+        WHERE courses.status != 'COMPLETED'
         ORDER BY lessons.dateMillis IS NULL ASC, lessons.dateMillis ASC, lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
         """
     )
@@ -100,6 +101,7 @@ interface LessonDao {
         FROM lessons
         INNER JOIN courses ON lessons.courseId = courses.id
         WHERE lessons.courseId = :courseId
+          AND courses.status != 'COMPLETED'
         ORDER BY lessons.dateMillis IS NULL ASC, lessons.dateMillis ASC, lessons.dayOfWeek ASC, lessons.startTimeMinutes ASC
         """
     )
@@ -107,6 +109,19 @@ interface LessonDao {
 
     @Query("SELECT * FROM lessons WHERE reminderEnabled = 1")
     suspend fun getLessonsWithReminderEnabled(): List<LessonEntity>
+
+    @Query("SELECT * FROM lessons WHERE courseId = :courseId")
+    suspend fun getLessonsForCourseOnce(courseId: Int): List<LessonEntity>
+
+    @Query(
+        """
+        UPDATE lessons
+        SET reminderEnabled = 0,
+            updatedAt = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+        WHERE courseId = :courseId
+        """
+    )
+    suspend fun disableLessonRemindersForCourse(courseId: Int)
 
     @Query(
         """
@@ -129,6 +144,21 @@ interface LessonDao {
 
     @Query("SELECT * FROM lessons WHERE sourceProvider = :provider")
     suspend fun getLessonsBySourceProvider(provider: String): List<LessonEntity>
+
+    @Query(
+        """
+        SELECT * FROM lessons
+        WHERE sourceProvider = :provider
+          AND courseId IN (:courseIds)
+        """
+    )
+    suspend fun getImportedLessonsForCourseIds(
+        provider: String,
+        courseIds: List<Int>
+    ): List<LessonEntity>
+
+    @Query("DELETE FROM lessons WHERE id IN (:ids)")
+    suspend fun deleteLessonsByIds(ids: List<Int>)
 
     @Query("DELETE FROM lessons WHERE sourceProvider = :provider")
     suspend fun deleteLessonsBySourceProvider(provider: String)

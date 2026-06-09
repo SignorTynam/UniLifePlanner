@@ -9,7 +9,9 @@ data class ExamsUiState(
     val upcomingExams: List<ExamAppealListItemUi> = emptyList(),
     val pastExams: List<ExamAppealListItemUi> = emptyList(),
     val showPastExams: Boolean = false,
-    val hasAnyExams: Boolean = false
+    val hasAnyExams: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val refreshMessage: String? = null
 )
 
 data class ExamCourseOptionUi(
@@ -28,6 +30,9 @@ data class ExamAppealListItemUi(
     val type: String?,
     val reminderEnabled: Boolean,
     val sourceLabel: String,
+    val feedbackStatus: String,
+    val feedbackResult: String?,
+    val feedbackGrade: String?,
     val startMillis: Long,
     val isPast: Boolean
 )

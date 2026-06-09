@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.unilifeplanner.domain.exams.ExamFeedbackStatus
 
 @Entity(
     tableName = "exam_appeals",
@@ -38,6 +39,12 @@ data class ExamAppealEntity(
     val source: String = ExamAppealSource.MANUAL.name,
     val externalId: String? = null,
     val officialUrl: String? = null,
+    val feedbackStatus: String = ExamFeedbackStatus.NOT_REQUESTED.name,
+    val feedbackResult: String? = null,
+    val feedbackGrade: String? = null,
+    val feedbackNotes: String? = null,
+    val feedbackAskedAtMillis: Long? = null,
+    val feedbackAnsweredAtMillis: Long? = null,
     val createdAt: Long,
     val updatedAt: Long
 )

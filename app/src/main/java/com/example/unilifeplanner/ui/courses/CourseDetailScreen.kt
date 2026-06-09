@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.courses.components.formatCourseStatus
 import com.example.unilifeplanner.ui.utils.ExternalIntentResult
@@ -212,16 +213,22 @@ private fun CourseDetailBody(
             CourseInfoCard(course = course)
         }
         item {
-            CourseExamsLinkCard(
-                courseId = course.id,
-                onOpenCourseExamsClick = onOpenCourseExamsClick
-            )
+            if (course.status == CourseStatus.COMPLETED.name) {
+                CompletedCourseCard()
+            } else {
+                CourseExamsLinkCard(
+                    courseId = course.id,
+                    onOpenCourseExamsClick = onOpenCourseExamsClick
+                )
+            }
         }
-        item {
-            CourseLessonsLinkCard(
-                courseId = course.id,
-                onOpenCourseLessonsClick = onOpenCourseLessonsClick
-            )
+        if (course.status != CourseStatus.COMPLETED.name) {
+            item {
+                CourseLessonsLinkCard(
+                    courseId = course.id,
+                    onOpenCourseLessonsClick = onOpenCourseLessonsClick
+                )
+            }
         }
         item {
             NotesCard(notes = course.notes)
@@ -236,6 +243,26 @@ private fun CourseDetailBody(
             ActionsCard(
                 onEditCourseClick = onEditCourseClick,
                 onDeleteClick = onDeleteClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompletedCourseCard() {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Corso completato",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Text(
+                text = "Le lezioni e gli appelli di questo corso non vengono piu mostrati nelle sezioni Lezioni ed Esami.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

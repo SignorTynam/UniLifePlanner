@@ -12,5 +12,7 @@ data class LessonsUiState(
     val upcomingLessons: List<LessonListItemUi> = emptyList(),
     val pastThisWeekLessons: List<LessonListItemUi> = emptyList(),
     val showPastThisWeek: Boolean = false,
-    val hasAnyLessons: Boolean = false
+    val hasAnyLessons: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val refreshMessage: String? = null
 )

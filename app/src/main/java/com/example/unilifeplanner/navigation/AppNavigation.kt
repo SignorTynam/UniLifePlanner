@@ -25,6 +25,7 @@ import com.example.unilifeplanner.ui.courses.AddEditCourseScreen
 import com.example.unilifeplanner.ui.courses.CourseDetailScreen
 import com.example.unilifeplanner.ui.courses.CoursesScreen
 import com.example.unilifeplanner.ui.exams.AddEditExamScreen
+import com.example.unilifeplanner.ui.exams.ExamFeedbackScreen
 import com.example.unilifeplanner.ui.exams.ExamsScreen
 import com.example.unilifeplanner.ui.home.HomeScreen
 import com.example.unilifeplanner.ui.lessons.AddEditLessonScreen
@@ -42,9 +43,11 @@ import kotlinx.coroutines.launch
 fun AppNavigation(
     navController: NavHostController,
     authViewModel: AuthViewModel = viewModel(),
-    initialCourseId: Int? = null
+    initialCourseId: Int? = null,
+    initialExamFeedbackId: Int? = null
 ) {
     var pendingCourseId by rememberSaveable { mutableStateOf(initialCourseId) }
+    var pendingExamFeedbackId by rememberSaveable { mutableStateOf(initialExamFeedbackId) }
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val startDestination = if (authUiState.isAuthenticated) {
         Screen.Home.route
@@ -202,6 +205,9 @@ fun AppNavigation(
                             Screen.AddEditExam.createRoute(examAppealId = examAppealId)
                         )
                     },
+                    onOpenFeedbackClick = { examAppealId ->
+                        navController.navigate(Screen.ExamFeedback.createRoute(examAppealId))
+                    },
                     onOpenCourseClick = { selectedCourseId ->
                         navController.navigate(Screen.CourseDetail.createRoute(selectedCourseId))
                     }
@@ -351,6 +357,31 @@ fun AppNavigation(
                 )
             }
 
+            composable(
+                route = Screen.ExamFeedback.route,
+                arguments = listOf(
+                    navArgument(Screen.ExamFeedback.ARG_EXAM_APPEAL_ID) {
+                        type = NavType.IntType
+                    }
+                )
+            ) { backStackEntry ->
+                val examAppealId = backStackEntry.arguments
+                    ?.getInt(Screen.ExamFeedback.ARG_EXAM_APPEAL_ID)
+                    ?: 0
+                ExamFeedbackScreen(
+                    examAppealId = examAppealId,
+                    onBackClick = { navController.popBackStack() },
+                    onSaved = { courseId, _ ->
+                        navController.navigate(Screen.CourseDetail.createRoute(courseId)) {
+                            popUpTo(Screen.Exams.route) {
+                                inclusive = false
+                            }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
             composable(Screen.AddEditCourse.route) {
                 AddEditCourseScreen(
                     courseId = null,
@@ -440,6 +471,14 @@ fun AppNavigation(
         if (courseId != null && authViewModel.uiState.value.isAuthenticated) {
             navController.navigate(Screen.CourseDetail.createRoute(courseId))
             pendingCourseId = null
+        }
+    }
+
+    LaunchedEffect(pendingExamFeedbackId) {
+        val examFeedbackId = pendingExamFeedbackId
+        if (examFeedbackId != null && authViewModel.uiState.value.isAuthenticated) {
+            navController.navigate(Screen.ExamFeedback.createRoute(examFeedbackId))
+            pendingExamFeedbackId = null
         }
     }
 }

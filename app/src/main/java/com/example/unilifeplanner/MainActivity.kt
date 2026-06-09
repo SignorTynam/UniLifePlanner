@@ -15,11 +15,13 @@ import com.example.unilifeplanner.domain.model.ThemeMode
 import com.example.unilifeplanner.navigation.AppNavigation
 import com.example.unilifeplanner.notifications.NotificationHelper
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
+import com.example.unilifeplanner.university.refresh.UniboAutoRefreshScheduler
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        UniboAutoRefreshScheduler.scheduleOnAppOpen(applicationContext)
         setContent {
             val context = LocalContext.current
             val settingsRepository = remember {
@@ -36,10 +38,15 @@ class MainActivity : ComponentActivity() {
                 val initialCourseId = intent
                     ?.getIntExtra(NotificationHelper.EXTRA_COURSE_ID, -1)
                     ?.takeIf { it > 0 }
+                val initialExamFeedbackId = intent
+                    ?.takeIf { it.getBooleanExtra(NotificationHelper.EXTRA_OPEN_EXAM_FEEDBACK, false) }
+                    ?.getIntExtra(NotificationHelper.EXTRA_EXAM_APPEAL_ID, -1)
+                    ?.takeIf { it > 0 }
 
                 AppNavigation(
                     navController = navController,
-                    initialCourseId = initialCourseId
+                    initialCourseId = initialCourseId,
+                    initialExamFeedbackId = initialExamFeedbackId
                 )
             }
         }

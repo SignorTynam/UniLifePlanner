@@ -14,7 +14,7 @@ import com.example.unilifeplanner.domain.lessons.nextLessonDateMillis
         LessonEntity::class,
         ExamAppealEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,7 +40,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
-                        MIGRATION_7_8
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .build()
 
@@ -208,6 +209,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE exam_appeals ADD COLUMN feedbackStatus TEXT NOT NULL DEFAULT 'NOT_REQUESTED'"
+                )
+                db.execSQL("ALTER TABLE exam_appeals ADD COLUMN feedbackResult TEXT")
+                db.execSQL("ALTER TABLE exam_appeals ADD COLUMN feedbackGrade TEXT")
+                db.execSQL("ALTER TABLE exam_appeals ADD COLUMN feedbackNotes TEXT")
+                db.execSQL("ALTER TABLE exam_appeals ADD COLUMN feedbackAskedAtMillis INTEGER")
+                db.execSQL("ALTER TABLE exam_appeals ADD COLUMN feedbackAnsweredAtMillis INTEGER")
+            }
+        }
+
         private fun createExamAppealsTable(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -224,6 +238,12 @@ abstract class AppDatabase : RoomDatabase() {
                     source TEXT NOT NULL DEFAULT 'MANUAL',
                     externalId TEXT,
                     officialUrl TEXT,
+                    feedbackStatus TEXT NOT NULL DEFAULT 'NOT_REQUESTED',
+                    feedbackResult TEXT,
+                    feedbackGrade TEXT,
+                    feedbackNotes TEXT,
+                    feedbackAskedAtMillis INTEGER,
+                    feedbackAnsweredAtMillis INTEGER,
                     createdAt INTEGER NOT NULL,
                     updatedAt INTEGER NOT NULL,
                     FOREIGN KEY(courseId) REFERENCES courses(id) ON DELETE CASCADE
@@ -255,6 +275,12 @@ abstract class AppDatabase : RoomDatabase() {
                     source,
                     externalId,
                     officialUrl,
+                    feedbackStatus,
+                    feedbackResult,
+                    feedbackGrade,
+                    feedbackNotes,
+                    feedbackAskedAtMillis,
+                    feedbackAnsweredAtMillis,
                     createdAt,
                     updatedAt
                 )
@@ -269,6 +295,12 @@ abstract class AppDatabase : RoomDatabase() {
                     NULL,
                     'MANUAL',
                     'legacy_course_exam_' || id,
+                    NULL,
+                    'NOT_REQUESTED',
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
                     NULL,
                     createdAt,
                     updatedAt

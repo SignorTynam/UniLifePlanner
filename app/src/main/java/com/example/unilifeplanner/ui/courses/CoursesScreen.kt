@@ -18,9 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,7 +34,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,9 +63,18 @@ fun CoursesScreen(
     onMenuClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.refreshMessage) {
+        uiState.refreshMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearRefreshMessage()
+        }
+    }
 
     CoursesScreenContent(
         uiState = uiState,
+        snackbarHostState = snackbarHostState,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onStatusFilterChange = viewModel::onStatusFilterChange,
         onFavoritesOnlyChange = viewModel::onFavoritesOnlyChange,
@@ -69,6 +83,7 @@ fun CoursesScreen(
         onAddCourseClick = onAddCourseClick,
         onCourseClick = onCourseClick,
         onFavoriteClick = viewModel::toggleFavorite,
+        onRefreshClick = viewModel::refreshUniboData,
         onMenuClick = onMenuClick
     )
 }
@@ -77,6 +92,7 @@ fun CoursesScreen(
 @Composable
 private fun CoursesScreenContent(
     uiState: CourseUiState,
+    snackbarHostState: SnackbarHostState,
     onSearchQueryChange: (String) -> Unit,
     onStatusFilterChange: (CourseStatusFilter) -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
@@ -85,13 +101,29 @@ private fun CoursesScreenContent(
     onAddCourseClick: () -> Unit,
     onCourseClick: (Int) -> Unit,
     onFavoriteClick: (CourseEntity) -> Unit,
+    onRefreshClick: () -> Unit,
     onMenuClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
             UniLifeTopBar(
                 title = "Corsi ed esami",
-                onMenuClick = onMenuClick
+                onMenuClick = onMenuClick,
+                actions = {
+                    IconButton(
+                        onClick = onRefreshClick,
+                        enabled = !uiState.isRefreshing
+                    ) {
+                        if (uiState.isRefreshing) {
+                            CircularProgressIndicator()
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "Aggiorna da UniBo"
+                            )
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -101,7 +133,8 @@ private fun CoursesScreenContent(
                     contentDescription = "Aggiungi corso"
                 )
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
         Box(
             modifier = Modifier

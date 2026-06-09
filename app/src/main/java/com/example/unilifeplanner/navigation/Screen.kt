@@ -69,4 +69,9 @@ sealed class Screen(val route: String) {
             }
         }
     }
+
+    data object ExamFeedback : Screen("exam_feedback/{examAppealId}") {
+        const val ARG_EXAM_APPEAL_ID = "examAppealId"
+        fun createRoute(examAppealId: Int): String = "exam_feedback/$examAppealId"
+    }
 }

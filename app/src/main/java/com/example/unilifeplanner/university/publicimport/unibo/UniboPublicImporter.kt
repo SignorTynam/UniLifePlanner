@@ -139,5 +139,6 @@ class UniboPublicImporter(
             timeMinutes = exam.timeMinutes,
             reminderDateTimeMillis = exam.reminderDateTimeMillis
         )
+        examAppealRepository.markFeedbackScheduled(exam.id)
     }
 }

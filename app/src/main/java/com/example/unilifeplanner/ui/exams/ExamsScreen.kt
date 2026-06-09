@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -65,6 +66,7 @@ fun ExamsScreen(
     onMenuClick: () -> Unit,
     onAddExamClick: (Int?) -> Unit,
     onEditExamClick: (Int) -> Unit,
+    onOpenFeedbackClick: (Int) -> Unit,
     onOpenCourseClick: (Int) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -100,11 +102,33 @@ fun ExamsScreen(
         }
     }
 
+    LaunchedEffect(uiState.refreshMessage) {
+        uiState.refreshMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearRefreshMessage()
+        }
+    }
+
     Scaffold(
         topBar = {
             UniLifeTopBar(
                 title = "Esami",
-                onMenuClick = onMenuClick
+                onMenuClick = onMenuClick,
+                actions = {
+                    IconButton(
+                        onClick = viewModel::refreshUniboData,
+                        enabled = !uiState.isRefreshing
+                    ) {
+                        if (uiState.isRefreshing) {
+                            CircularProgressIndicator()
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = "Aggiorna da UniBo"
+                            )
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -145,6 +169,7 @@ fun ExamsScreen(
                     onClearCourseFilter = viewModel::clearCourseFilter,
                     onTogglePastExams = viewModel::togglePastExamsVisibility,
                     onEditExamClick = onEditExamClick,
+                    onOpenFeedbackClick = onOpenFeedbackClick,
                     onDeleteExamClick = viewModel::deleteExamAppeal,
                     onOpenCourseClick = onOpenCourseClick,
                     onToggleReminder = { exam, enabled ->
@@ -171,6 +196,7 @@ private fun ExamsContent(
     onClearCourseFilter: () -> Unit,
     onTogglePastExams: () -> Unit,
     onEditExamClick: (Int) -> Unit,
+    onOpenFeedbackClick: (Int) -> Unit,
     onDeleteExamClick: (Int) -> Unit,
     onOpenCourseClick: (Int) -> Unit,
     onToggleReminder: (ExamAppealListItemUi, Boolean) -> Unit
@@ -224,6 +250,7 @@ private fun ExamsContent(
                 ExamAppealCard(
                     exam = exam,
                     onEditClick = { onEditExamClick(exam.examAppealId) },
+                    onFeedbackClick = { onOpenFeedbackClick(exam.examAppealId) },
                     onDeleteClick = { pendingDeleteExam = exam },
                     onOpenCourseClick = { onOpenCourseClick(exam.courseId) },
                     onToggleReminderClick = { onToggleReminder(exam, !exam.reminderEnabled) }
@@ -254,6 +281,7 @@ private fun ExamsContent(
                 ExamAppealCard(
                     exam = exam,
                     onEditClick = { onEditExamClick(exam.examAppealId) },
+                    onFeedbackClick = { onOpenFeedbackClick(exam.examAppealId) },
                     onDeleteClick = { pendingDeleteExam = exam },
                     onOpenCourseClick = { onOpenCourseClick(exam.courseId) },
                     onToggleReminderClick = { onToggleReminder(exam, !exam.reminderEnabled) }
@@ -362,6 +390,7 @@ private fun ExamsActionsCard(
 private fun ExamAppealCard(
     exam: ExamAppealListItemUi,
     onEditClick: () -> Unit,
+    onFeedbackClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onOpenCourseClick: () -> Unit,
     onToggleReminderClick: () -> Unit
@@ -411,6 +440,9 @@ private fun ExamAppealCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            exam.feedbackChipText()?.let { feedbackText ->
+                InfoPill(text = feedbackText)
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -438,6 +470,14 @@ private fun ExamAppealCard(
                         )
                     }
                 )
+            }
+            if (exam.isPast && exam.reminderEnabled && exam.feedbackResult == null) {
+                OutlinedButton(
+                    onClick = onFeedbackClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = "Registra esito")
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -478,6 +518,21 @@ private fun ExamAppealCard(
                 }
             }
         }
+    }
+}
+
+private fun ExamAppealListItemUi.feedbackChipText(): String? {
+    return when (feedbackStatus) {
+        "PENDING", "SCHEDULED" -> if (isPast) "Esito da registrare" else null
+        "ANSWERED" -> when (feedbackResult) {
+            "PASSED" -> listOfNotNull("Esito: Superato", feedbackGrade?.let { "voto $it" })
+                .joinToString(" - ")
+            "FAILED" -> "Esito: Non superato"
+            "WAITING_RESULT" -> "Esito: In attesa"
+            "NOT_ATTENDED" -> "Non partecipato"
+            else -> null
+        }
+        else -> null
     }
 }
 

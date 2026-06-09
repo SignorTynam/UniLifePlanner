@@ -32,6 +32,26 @@ L'import pubblico non richiede login UniBo, username, password, token o OAuth. N
 
 I record importati usano `sourceProvider = "UNIBO_PUBLIC"` per insegnamenti e lezioni, e `source = "UNIBO"` per gli appelli d'esame. Ogni record ha un `externalId` stabile. L'import successivo aggiorna i record gia importati con lo stesso provider/source e ID, senza duplicare insegnamenti, lezioni o appelli. I dati creati manualmente dall'utente non hanno questi campi e non vengono sovrascritti.
 
+## Aggiornamento dati UniBo
+
+Dopo un import riuscito, l'app salva la scelta pubblica UniBo dell'utente: corso di laurea, anno accademico, sito pubblico e curriculum se selezionato.
+
+Il refresh aggiorna corsi, lezioni/laboratori e appelli d'esame pubblici in un unico flusso. E disponibile dalle schermate "Corsi", "Lezioni" ed "Esami" e viene eseguito anche automaticamente all'apertura dell'app se esiste una importazione UniBo precedente.
+
+Il refresh non richiede login, non usa AlmaEsami e legge solo pagine pubbliche UniBo. I dati manuali non vengono cancellati. Le lezioni e gli appelli UniBo non piu presenti nel preview aggiornato possono essere rimossi, con cancellazione dei relativi promemoria schedulati.
+
+## Corsi completati
+
+Un corso con stato `COMPLETED` resta visibile nella schermata "Corsi", ma le lezioni e gli appelli collegati non vengono mostrati nelle sezioni "Lezioni" ed "Esami".
+
+I dati non vengono eliminati. Quando un corso viene completato, i promemoria futuri di lezioni e appelli collegati vengono cancellati e disattivati. Se il corso viene riaperto, lezioni e appelli tornano visibili, ma i vecchi promemoria non vengono riattivati automaticamente.
+
+## Feedback post-esame
+
+Se l'utente attiva il promemoria su un appello, l'app puo chiedere dopo l'esame com'e andata. La notifica post-esame apre una schermata in cui registrare esito, voto opzionale e note personali.
+
+Se l'esame e superato, l'utente puo segnare il corso come completato. In quel caso lezioni e appelli collegati spariscono dalle sezioni principali e i relativi promemoria vengono disattivati.
+
 ## Manutenzione parser
 
 I selettori CSS sono centralizzati in `UniboPublicParser`. Le URL pubbliche sono centralizzate in `UniboPublicConfig`. Se UniBo cambia struttura HTML:
@@ -59,9 +79,13 @@ I selettori CSS sono centralizzati in `UniboPublicParser`. Le URL pubbliche sono
 14. Ripetere l'import e verificare che non crei duplicati.
 15. Verificare che il pulsante "Importa UniBo" non sia piu presente nella schermata "Esami".
 16. Verificare che l'import avvenga solo da "Universita".
-17. Disattivare internet e verificare un errore pulito.
-18. Verificare tema chiaro/scuro.
-19. Verificare `versionName = "1.1.5"`.
+17. Premere Refresh da "Corsi", "Lezioni" ed "Esami" e verificare che venga aggiornato l'intero set UniBo.
+18. Completare un corso e verificare che lezioni e appelli collegati non compaiano nelle sezioni principali.
+19. Attivare un promemoria appello futuro e verificare la schedulazione del feedback post-esame.
+20. Registrare un esito superato e verificare l'opzione di completamento corso.
+21. Disattivare internet e verificare un errore pulito.
+22. Verificare tema chiaro/scuro.
+23. Verificare `versionName = "1.1.6"`.
 
 ## TODO futuri
 

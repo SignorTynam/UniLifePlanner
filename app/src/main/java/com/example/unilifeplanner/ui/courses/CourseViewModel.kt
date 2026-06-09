@@ -7,12 +7,16 @@ import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
+import com.example.unilifeplanner.domain.courses.CourseCompletionManager
 import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.notifications.ExamReminderScheduler
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
+import com.example.unilifeplanner.university.refresh.UniboRefreshManager
+import com.example.unilifeplanner.university.refresh.UniboRefreshSource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,8 +37,16 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     private val lessonRepository = LessonRepository(
         database.lessonDao()
     )
+    private val examAppealRepository = ExamAppealRepository(database.examAppealDao())
     private val reminderScheduler = ExamReminderScheduler(application.applicationContext)
     private val lessonReminderScheduler = LessonReminderScheduler(application.applicationContext)
+    private val courseCompletionManager = CourseCompletionManager(
+        lessonRepository = lessonRepository,
+        examAppealRepository = examAppealRepository,
+        lessonReminderScheduler = lessonReminderScheduler,
+        examReminderScheduler = reminderScheduler
+    )
+    private val uniboRefreshManager = UniboRefreshManager(application.applicationContext)
 
     private val _allCourses = MutableStateFlow<List<CourseEntity>>(emptyList())
 
@@ -61,6 +73,8 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    private val _isRefreshing = MutableStateFlow(false)
+    private val _refreshMessage = MutableStateFlow<String?>(null)
 
     private val _addEditUiState = MutableStateFlow(AddEditCourseUiState())
     val addEditUiState: StateFlow<AddEditCourseUiState> = _addEditUiState.asStateFlow()
@@ -96,11 +110,15 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<CourseUiState> = combine(
         filterUiState,
         _isLoading,
-        _errorMessage
-    ) { state, isLoading, errorMessage ->
+        _errorMessage,
+        _isRefreshing,
+        _refreshMessage
+    ) { state, isLoading, errorMessage, isRefreshing, refreshMessage ->
         state.copy(
             isLoading = isLoading,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            isRefreshing = isRefreshing,
+            refreshMessage = refreshMessage
         )
     }.stateIn(
         scope = viewModelScope,
@@ -315,6 +333,13 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                         reminderEnabled = false,
                         notes = state.notes
                     )
+                    if (state.status == CourseStatus.COMPLETED &&
+                        existingCourse.status != CourseStatus.COMPLETED.name
+                    ) {
+                        courseCompletionManager.disableFutureRemindersForCompletedCourse(
+                            existingCourse.id
+                        )
+                    }
                 }
 
                 _addEditUiState.update {
@@ -425,6 +450,11 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     reminderEnabled = reminderEnabled,
                     notes = notes
                 )
+                if (status == CourseStatus.COMPLETED &&
+                    course.status != CourseStatus.COMPLETED.name
+                ) {
+                    courseCompletionManager.disableFutureRemindersForCompletedCourse(course.id)
+                }
             }
         }
     }
@@ -438,6 +468,8 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     .forEach { lesson ->
                         lessonReminderScheduler.cancelLessonReminder(lesson.id)
                     }
+                examAppealRepository.getExamAppealsForCourseOnce(course.id)
+                    .forEach { exam -> reminderScheduler.cancelExamAppealReminders(exam.id) }
                 repository.deleteCourse(course)
                 _selectedCourse.value = null
                 _courseDetailUiState.value = CourseDetailUiState(deleteSuccess = true)
@@ -460,6 +492,8 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
                     .forEach { lesson ->
                         lessonReminderScheduler.cancelLessonReminder(lesson.id)
                     }
+                examAppealRepository.getExamAppealsForCourseOnce(courseId)
+                    .forEach { exam -> reminderScheduler.cancelExamAppealReminders(exam.id) }
                 repository.deleteCourseById(courseId)
             }
         }
@@ -589,6 +623,26 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
 
     fun resetDeleteState() {
         _courseDetailUiState.update { it.copy(deleteSuccess = false) }
+    }
+
+    fun refreshUniboData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                _refreshMessage.value = uniboRefreshManager.refreshImportedUniboData(
+                    source = UniboRefreshSource.MANUAL,
+                    force = true
+                ).message
+            } catch (exception: Exception) {
+                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova piu tardi."
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun clearRefreshMessage() {
+        _refreshMessage.value = null
     }
 
     private fun observeCourses() {

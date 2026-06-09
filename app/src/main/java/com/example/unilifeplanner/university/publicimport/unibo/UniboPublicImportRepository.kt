@@ -71,14 +71,17 @@ class UniboPublicImportRepository(
 
     override suspend fun loadPreview(
         degreeProgram: PublicDegreeProgram,
-        curriculum: PublicCurriculum?
+        curriculum: PublicCurriculum?,
+        forceRefresh: Boolean
     ): PublicImportPreview {
         val cacheKey = listOf(
             degreeProgram.externalId,
             degreeProgram.academicYear,
             curriculum?.externalId.orEmpty()
         ).joinToString("|")
-        cache.getPreview(cacheKey)?.let { return it }
+        if (!forceRefresh) {
+            cache.getPreview(cacheKey)?.let { return it }
+        }
 
         val warnings = mutableListOf<String>()
         val detailHtml = client.getDegreeProgramPage(degreeProgram.officialUrl)

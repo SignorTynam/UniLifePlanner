@@ -19,6 +19,7 @@ object NotificationHelper {
     const val EXTRA_COURSE_ID = "extra_course_id"
     const val EXTRA_LESSON_ID = "extra_lesson_id"
     const val EXTRA_EXAM_APPEAL_ID = "extra_exam_appeal_id"
+    const val EXTRA_OPEN_EXAM_FEEDBACK = "extra_open_exam_feedback"
     const val CHANNEL_ID_LESSON_REMINDERS = "lesson_reminders"
     const val CHANNEL_NAME_LESSON_REMINDERS = "Promemoria lezioni"
     const val CHANNEL_DESCRIPTION_LESSON_REMINDERS =
@@ -27,6 +28,10 @@ object NotificationHelper {
     private const val CHANNEL_ID = "exam_reminders"
     private const val CHANNEL_NAME = "Promemoria esami"
     private const val CHANNEL_DESCRIPTION = "Notifiche locali per ricordare gli esami"
+    private const val CHANNEL_ID_EXAM_FEEDBACK = "exam_feedback"
+    private const val CHANNEL_NAME_EXAM_FEEDBACK = "Feedback esami"
+    private const val CHANNEL_DESCRIPTION_EXAM_FEEDBACK =
+        "Notifiche per registrare l'esito dopo un appello"
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -45,10 +50,18 @@ object NotificationHelper {
         ).apply {
             description = CHANNEL_DESCRIPTION_LESSON_REMINDERS
         }
+        val feedbackChannel = NotificationChannel(
+            CHANNEL_ID_EXAM_FEEDBACK,
+            CHANNEL_NAME_EXAM_FEEDBACK,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = CHANNEL_DESCRIPTION_EXAM_FEEDBACK
+        }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(examChannel)
         notificationManager.createNotificationChannel(lessonChannel)
+        notificationManager.createNotificationChannel(feedbackChannel)
     }
 
     fun showExamReminderNotification(
@@ -67,6 +80,7 @@ object NotificationHelper {
             ExamReminderType.DAY_BEFORE -> "Domani hai l'appello di $courseName"
             ExamReminderType.SAME_DAY -> "Oggi hai l'appello di $courseName"
             ExamReminderType.CUSTOM -> "Promemoria appello per $courseName"
+            ExamReminderType.POST_EXAM_FEEDBACK -> "Registra l'esito dell'appello di $courseName"
         }
         val expandedMessage = listOf(message, examDateText.takeIf { it.isNotBlank() })
             .filterNotNull()
@@ -97,6 +111,45 @@ object NotificationHelper {
 
         NotificationManagerCompat.from(context).notify(
             examNotificationId(examAppealId, reminderType),
+            notification
+        )
+    }
+
+    fun showPostExamFeedbackNotification(
+        context: Context,
+        examAppealId: Int,
+        courseId: Int,
+        courseName: String
+    ) {
+        if (!hasNotificationPermission(context)) return
+
+        createNotificationChannel(context)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_COURSE_ID, courseId)
+            putExtra(EXTRA_EXAM_APPEAL_ID, examAppealId)
+            putExtra(EXTRA_OPEN_EXAM_FEEDBACK, true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            feedbackNotificationId(examAppealId),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val message = "Registra l'esito dell'appello di $courseName nel planner."
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_EXAM_FEEDBACK)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Com'e andato l'esame?")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(
+            feedbackNotificationId(examAppealId),
             notification
         )
     }
@@ -166,10 +219,13 @@ object NotificationHelper {
             ExamReminderType.DAY_BEFORE -> 1
             ExamReminderType.SAME_DAY -> 2
             ExamReminderType.CUSTOM -> 3
+            ExamReminderType.POST_EXAM_FEEDBACK -> 4
         }
 
         return 400_000 + examAppealId * 10 + suffix
     }
 
     private fun lessonNotificationId(lessonId: Int): Int = 300_000 + lessonId
+
+    private fun feedbackNotificationId(examAppealId: Int): Int = 500_000 + examAppealId
 }

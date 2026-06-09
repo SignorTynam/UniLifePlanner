@@ -34,6 +34,13 @@ class ExamReminderScheduler(
                 triggerAtMillis = reminderDateTimeMillis,
                 reminderType = ExamReminderType.CUSTOM
             )
+            schedulePostExamFeedback(
+                examAppealId = examAppealId,
+                courseId = courseId,
+                courseName = courseName,
+                examDateMillis = examDateMillis,
+                timeMinutes = timeMinutes
+            )
             return
         }
 
@@ -63,12 +70,20 @@ class ExamReminderScheduler(
             triggerAtMillis = sameDayTriggerAtMillis,
             reminderType = ExamReminderType.SAME_DAY
         )
+        schedulePostExamFeedback(
+            examAppealId = examAppealId,
+            courseId = courseId,
+            courseName = courseName,
+            examDateMillis = examDateMillis,
+            timeMinutes = timeMinutes
+        )
     }
 
     fun cancelExamAppealReminders(examAppealId: Int) {
         workManager.cancelUniqueWork(workName(examAppealId, ExamReminderType.DAY_BEFORE))
         workManager.cancelUniqueWork(workName(examAppealId, ExamReminderType.SAME_DAY))
         workManager.cancelUniqueWork(workName(examAppealId, ExamReminderType.CUSTOM))
+        workManager.cancelUniqueWork(feedbackWorkName(examAppealId))
     }
 
     fun rescheduleExamAppealReminders(
@@ -129,6 +144,40 @@ class ExamReminderScheduler(
         )
     }
 
+    private fun schedulePostExamFeedback(
+        examAppealId: Int,
+        courseId: Int,
+        courseName: String,
+        examDateMillis: Long,
+        timeMinutes: Int?
+    ) {
+        workManager.cancelUniqueWork(feedbackWorkName(examAppealId))
+        val triggerAtMillis = if (timeMinutes == null) {
+            postExamFeedbackTriggerMillis(examDateMillis, timeMinutes)
+        } else {
+            postExamFeedbackTriggerMillis(examDateMillis, timeMinutes)
+        }
+        val delay = triggerAtMillis - System.currentTimeMillis()
+        if (delay <= 0L) return
+
+        val request = OneTimeWorkRequestBuilder<PostExamFeedbackWorker>()
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .setInputData(
+                workDataOf(
+                    PostExamFeedbackWorker.KEY_EXAM_APPEAL_ID to examAppealId,
+                    PostExamFeedbackWorker.KEY_COURSE_ID to courseId,
+                    PostExamFeedbackWorker.KEY_COURSE_NAME to courseName
+                )
+            )
+            .build()
+
+        workManager.enqueueUniqueWork(
+            feedbackWorkName(examAppealId),
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
     private fun workName(
         examAppealId: Int,
         reminderType: ExamReminderType
@@ -137,6 +186,7 @@ class ExamReminderScheduler(
             ExamReminderType.DAY_BEFORE -> "day_before"
             ExamReminderType.SAME_DAY -> "same_day"
             ExamReminderType.CUSTOM -> "custom"
+            ExamReminderType.POST_EXAM_FEEDBACK -> "post_exam_feedback"
         }
 
         return "exam_appeal_reminder_${examAppealId}_$suffix"
@@ -150,13 +200,34 @@ class ExamReminderScheduler(
             ExamReminderType.DAY_BEFORE -> "day_before"
             ExamReminderType.SAME_DAY -> "same_day"
             ExamReminderType.CUSTOM -> "custom"
+            ExamReminderType.POST_EXAM_FEEDBACK -> "post_exam_feedback"
         }
 
         return "exam_reminder_${courseId}_$suffix"
     }
+
+    private fun feedbackWorkName(examAppealId: Int): String =
+        "exam_appeal_feedback_$examAppealId"
 
     private companion object {
         const val ONE_DAY_MILLIS = 24 * 60 * 60 * 1000L
         const val DEFAULT_SAME_DAY_HOUR_MILLIS = 8 * 60 * 60 * 1000L
     }
 }
+
+internal fun postExamFeedbackTriggerMillis(
+    examDateMillis: Long,
+    timeMinutes: Int?
+): Long {
+    return if (timeMinutes == null) {
+        examDateMillis + DEFAULT_FEEDBACK_NO_TIME_HOUR_MILLIS
+    } else {
+        examStartMillis(
+            dateMillis = examDateMillis,
+            timeMinutes = timeMinutes
+        ) + POST_EXAM_FEEDBACK_DELAY_MILLIS
+    }
+}
+
+private const val POST_EXAM_FEEDBACK_DELAY_MILLIS = 5 * 60 * 60 * 1000L
+private const val DEFAULT_FEEDBACK_NO_TIME_HOUR_MILLIS = 18 * 60 * 60 * 1000L

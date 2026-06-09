@@ -32,6 +32,9 @@ class LessonRepository(
     suspend fun getLessonsWithReminderEnabled(): List<LessonEntity> =
         lessonDao.getLessonsWithReminderEnabled()
 
+    suspend fun getLessonsForCourseOnce(courseId: Int): List<LessonEntity> =
+        lessonDao.getLessonsForCourseOnce(courseId)
+
     suspend fun insertLesson(lesson: LessonEntity): Long {
         val now = System.currentTimeMillis()
         return lessonDao.insertLesson(
@@ -119,12 +122,29 @@ class LessonRepository(
         )
     }
 
+    suspend fun disableLessonRemindersForCourse(courseId: Int) {
+        lessonDao.disableLessonRemindersForCourse(courseId)
+    }
+
     suspend fun deleteLessonsForCourse(courseId: Int) {
         lessonDao.deleteLessonsForCourse(courseId)
     }
 
     suspend fun getLessonsBySourceProvider(provider: String): List<LessonEntity> =
         lessonDao.getLessonsBySourceProvider(provider)
+
+    suspend fun getImportedLessonsForCourseIds(
+        provider: String,
+        courseIds: List<Int>
+    ): List<LessonEntity> {
+        if (courseIds.isEmpty()) return emptyList()
+        return lessonDao.getImportedLessonsForCourseIds(provider, courseIds)
+    }
+
+    suspend fun deleteLessonsByIds(ids: List<Int>) {
+        if (ids.isEmpty()) return
+        lessonDao.deleteLessonsByIds(ids)
+    }
 
     suspend fun deleteLessonsBySourceProvider(provider: String) {
         lessonDao.deleteLessonsBySourceProvider(provider)

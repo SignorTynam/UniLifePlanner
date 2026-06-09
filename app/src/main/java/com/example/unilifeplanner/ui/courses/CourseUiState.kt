@@ -10,7 +10,9 @@ data class CourseUiState(
     val courses: List<CourseEntity> = emptyList(),
     val filteredCourses: List<CourseEntity> = emptyList(),
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isRefreshing: Boolean = false,
+    val refreshMessage: String? = null
 )
 
 enum class CourseStatusFilter {

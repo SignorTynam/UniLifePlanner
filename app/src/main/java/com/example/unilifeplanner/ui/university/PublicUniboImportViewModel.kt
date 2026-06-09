@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.local.AppDatabase
+import com.example.unilifeplanner.data.datastore.UniboImportDataStore
 import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
@@ -25,6 +26,7 @@ class PublicUniboImportViewModel(
     application: Application
 ) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
+    private val uniboImportDataStore = UniboImportDataStore(application.applicationContext)
     private val repository = UniboPublicImportRepository(
         importer = UniboPublicImporter(
             courseRepository = CourseRepository(database.courseDao()),
@@ -175,6 +177,7 @@ class PublicUniboImportViewModel(
 
             try {
                 val result = repository.importPreview(preview)
+                uniboImportDataStore.saveSuccessfulImport(preview)
                 _uiState.update {
                     it.copy(
                         status = PublicImportStatus.Imported,
