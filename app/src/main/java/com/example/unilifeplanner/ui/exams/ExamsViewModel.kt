@@ -10,10 +10,15 @@ import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.domain.exams.examStartMillis
 import com.example.unilifeplanner.domain.exams.formatExamDate
+import com.example.unilifeplanner.domain.lessons.dayOfWeekLabel
 import com.example.unilifeplanner.domain.lessons.formatMinutesToTime
 import com.example.unilifeplanner.notifications.ExamReminderScheduler
+import com.example.unilifeplanner.ui.exams.components.needsFeedbackRegistration
 import com.example.unilifeplanner.university.refresh.UniboRefreshManager
 import com.example.unilifeplanner.university.refresh.UniboRefreshSource
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +36,11 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
     private val examReminderScheduler = ExamReminderScheduler(application.applicationContext)
     private val uniboRefreshManager = UniboRefreshManager(application.applicationContext)
 
+    private val _searchQuery = MutableStateFlow("")
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
+    private val _selectedDateFilter = MutableStateFlow(ExamDateFilter.ALL)
+    private val _selectedSortOption = MutableStateFlow(ExamSortOption.NEXT_UPCOMING)
+    private val _selectedExamDayMillis = MutableStateFlow<Long?>(null)
     private val _showPastExams = MutableStateFlow(false)
     private val _isLoading = MutableStateFlow(true)
     private val _errorMessage = MutableStateFlow<String?>(null)
@@ -39,6 +48,34 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
     private val _refreshMessage = MutableStateFlow<String?>(null)
 
     private var hasAppliedInitialCourse = false
+
+    private val filterStateFlow = combine(
+        combine(
+            _searchQuery,
+            _selectedCourseId,
+            _selectedDateFilter
+        ) { searchQuery, selectedCourseId, dateFilter ->
+            Triple(searchQuery, selectedCourseId, dateFilter)
+        },
+        combine(
+            _selectedSortOption,
+            _selectedExamDayMillis,
+            _showPastExams
+        ) { sortOption, selectedExamDayMillis, showPast ->
+            Triple(sortOption, selectedExamDayMillis, showPast)
+        }
+    ) { searchCourseDate, sortDayPast ->
+        val (searchQuery, selectedCourseId, dateFilter) = searchCourseDate
+        val (sortOption, selectedExamDayMillis, showPast) = sortDayPast
+        ExamFilterState(
+            searchQuery = searchQuery,
+            selectedCourseId = selectedCourseId,
+            dateFilter = dateFilter,
+            sortOption = sortOption,
+            selectedExamDayMillis = selectedExamDayMillis,
+            showPast = showPast
+        )
+    }
 
     private val refreshStateFlow = combine(
         _isRefreshing,
@@ -50,64 +87,91 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private val controlsFlow = combine(
-        _selectedCourseId,
-        _showPastExams,
+    private val examsFlow = examAppealRepository.getExamAppealsWithCourse()
+        .catch { throwable ->
+            _errorMessage.value = throwable.message ?: "Errore nel caricamento degli appelli"
+            emit(emptyList())
+        }
+
+    private val dataStateFlow = combine(
+        examsFlow,
+        courseRepository.allCourses,
+        filterStateFlow
+    ) { exams, courses, filters ->
+        Triple(exams, courses, filters)
+    }
+
+    private val statusStateFlow = combine(
         _isLoading,
         _errorMessage,
         refreshStateFlow
-    ) { selectedCourseId, showPast, isLoading, errorMessage, refreshState ->
-        ExamControls(
-            selectedCourseId = selectedCourseId,
-            showPast = showPast,
-            isLoading = isLoading,
-            errorMessage = errorMessage,
-            isRefreshing = refreshState.isRefreshing,
-            refreshMessage = refreshState.refreshMessage
-        )
+    ) { isLoading, errorMessage, refreshState ->
+        Triple(isLoading, errorMessage, refreshState)
     }
 
     val uiState: StateFlow<ExamsUiState> = combine(
-        examAppealRepository.getExamAppealsWithCourse()
-            .catch { throwable ->
-                _errorMessage.value = throwable.message ?: "Errore nel caricamento degli appelli"
-                emit(emptyList())
-            },
-        courseRepository.allCourses,
-        controlsFlow
-    ) { exams, courses, controls ->
+        dataStateFlow,
+        statusStateFlow
+    ) { dataState, statusState ->
+        val (exams, courses, filters) = dataState
+        val (isLoading, errorMessage, refreshState) = statusState
+        val nowMillis = System.currentTimeMillis()
         val availableCourses = courses
             .filter { it.status != com.example.unilifeplanner.domain.model.CourseStatus.COMPLETED.name }
             .map { course -> ExamCourseOptionUi(course.id, course.name) }
             .sortedBy { it.courseName.lowercase() }
-        val effectiveSelectedCourseId = controls.selectedCourseId
+        val effectiveSelectedCourseId = filters.selectedCourseId
             ?.takeIf { id -> availableCourses.any { it.courseId == id } }
-        val filteredExams = exams.filter { exam ->
-            effectiveSelectedCourseId == null || exam.exam.courseId == effectiveSelectedCourseId
+        val selectedCourseName = effectiveSelectedCourseId?.let { id ->
+            availableCourses.firstOrNull { it.courseId == id }?.courseName
         }
-        val now = System.currentTimeMillis()
-        val items = filteredExams.map { exam -> exam.toListItem(now) }
-        val upcoming = items
-            .filter { !it.isPast }
-            .sortedBy { it.startMillis }
-        val past = items
-            .filter { it.isPast }
-            .sortedByDescending { it.startMillis }
+
+        val baseFiltered = exams
+            .filter { effectiveSelectedCourseId == null || it.exam.courseId == effectiveSelectedCourseId }
+            .filter { matchesSearch(it, filters.searchQuery) }
+            .filter { matchesDateFilter(it, filters.dateFilter, nowMillis) }
+
+        val itemsBeforeDayFilter = baseFiltered.map { it.toListItem(nowMillis) }
+        val dayFilteredItems = filters.selectedExamDayMillis?.let { dayMillis ->
+            itemsBeforeDayFilter.filter { it.dayKeyMillis == dayMillis }
+        } ?: itemsBeforeDayFilter
+
+        val (pastBeforeSort, upcomingBeforeSort) = dayFilteredItems.partition { it.isPast }
+        val upcoming = sortExams(upcomingBeforeSort, filters.sortOption, isPast = false)
+        val past = sortExams(pastBeforeSort, filters.sortOption, isPast = true)
+
+        val agendaBase = exams
+            .filter { effectiveSelectedCourseId == null || it.exam.courseId == effectiveSelectedCourseId }
+            .filter { matchesSearch(it, filters.searchQuery) }
+            .map { it.toListItem(nowMillis) }
+
+        val upcomingAgenda = agendaBase.filter { !it.isPast }
+        val pastAgenda = agendaBase.filter { it.isPast }
 
         ExamsUiState(
-            isLoading = controls.isLoading,
-            errorMessage = controls.errorMessage,
+            isLoading = isLoading,
+            errorMessage = errorMessage,
+            searchQuery = filters.searchQuery,
             selectedCourseId = effectiveSelectedCourseId,
-            selectedCourseName = effectiveSelectedCourseId?.let { id ->
-                availableCourses.firstOrNull { it.courseId == id }?.courseName
-            },
+            selectedCourseName = selectedCourseName,
+            selectedDateFilter = filters.dateFilter,
+            selectedSortOption = filters.sortOption,
+            selectedExamDayMillis = filters.selectedExamDayMillis,
             availableCourses = availableCourses,
             upcomingExams = upcoming,
             pastExams = past,
-            showPastExams = controls.showPast,
+            showPastExams = filters.showPast,
             hasAnyExams = exams.isNotEmpty(),
-            isRefreshing = controls.isRefreshing,
-            refreshMessage = controls.refreshMessage
+            isRefreshing = refreshState.isRefreshing,
+            refreshMessage = refreshState.refreshMessage,
+            filteredResultCount = upcoming.size + past.size,
+            upcomingExamCount = upcomingAgenda.size,
+            thisWeekExamCount = countExamsThisWeek(upcomingAgenda, nowMillis),
+            reminderExamCount = agendaBase.count { it.reminderEnabled },
+            pendingFeedbackCount = pastAgenda.count { it.needsFeedbackRegistration() },
+            examCountByDay = upcomingAgenda
+                .groupingBy { it.dayKeyMillis }
+                .eachCount()
         )
     }.stateIn(
         scope = viewModelScope,
@@ -117,7 +181,7 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            examAppealRepository.getExamAppealsWithCourse().collect {
+            examsFlow.collect {
                 _isLoading.value = false
             }
         }
@@ -129,12 +193,36 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         hasAppliedInitialCourse = true
     }
 
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun onDateFilterChange(filter: ExamDateFilter) {
+        _selectedDateFilter.value = filter
+    }
+
+    fun onSortOptionChange(option: ExamSortOption) {
+        _selectedSortOption.value = option
+    }
+
+    fun onSelectedExamDayChange(dayMillis: Long?) {
+        _selectedExamDayMillis.value = dayMillis
+    }
+
     fun onCourseFilterChange(courseId: Int?) {
         _selectedCourseId.value = courseId
     }
 
     fun clearCourseFilter() {
         _selectedCourseId.value = null
+    }
+
+    fun clearFilters() {
+        _searchQuery.value = ""
+        _selectedCourseId.value = null
+        _selectedDateFilter.value = ExamDateFilter.ALL
+        _selectedSortOption.value = ExamSortOption.NEXT_UPCOMING
+        _selectedExamDayMillis.value = null
     }
 
     fun togglePastExamsVisibility() {
@@ -172,10 +260,10 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
                         examAppealId = exam.id,
                         courseId = exam.courseId,
                         courseName = examWithCourse.courseName,
-                    examDateMillis = exam.dateMillis,
-                    timeMinutes = exam.timeMinutes,
-                    reminderDateTimeMillis = exam.reminderDateTimeMillis
-                )
+                        examDateMillis = exam.dateMillis,
+                        timeMinutes = exam.timeMinutes,
+                        reminderDateTimeMillis = exam.reminderDateTimeMillis
+                    )
                     examAppealRepository.markFeedbackScheduled(exam.id)
                 } else {
                     examReminderScheduler.cancelExamAppealReminders(exam.id)
@@ -210,7 +298,7 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
                     force = true
                 ).message
             } catch (exception: Exception) {
-                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova piu tardi."
+                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova più tardi."
             } finally {
                 _isRefreshing.value = false
             }
@@ -221,11 +309,102 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         _refreshMessage.value = null
     }
 
+    private fun matchesSearch(exam: ExamAppealWithCourse, query: String): Boolean {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) return true
+
+        return listOf(
+            exam.courseName,
+            exam.exam.location,
+            exam.exam.type,
+            exam.exam.notes
+        ).any { value -> value?.contains(normalizedQuery, ignoreCase = true) == true }
+    }
+
+    private fun matchesDateFilter(
+        exam: ExamAppealWithCourse,
+        filter: ExamDateFilter,
+        nowMillis: Long
+    ): Boolean {
+        val zoneId = ZoneId.systemDefault()
+        val today = Instant.ofEpochMilli(nowMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+        val examDate = Instant.ofEpochMilli(exam.exam.dateMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+        val startMillis = examStartMillis(
+            dateMillis = exam.exam.dateMillis,
+            timeMinutes = exam.exam.timeMinutes
+        )
+
+        return when (filter) {
+            ExamDateFilter.ALL -> true
+            ExamDateFilter.TODAY -> examDate == today
+            ExamDateFilter.TOMORROW -> examDate == today.plusDays(1)
+            ExamDateFilter.THIS_WEEK -> !examDate.isBefore(today) &&
+                !examDate.isAfter(today.plusDays(6))
+            ExamDateFilter.THIS_MONTH -> examDate.year == today.year &&
+                examDate.month == today.month
+            ExamDateFilter.REMINDER_ENABLED -> exam.exam.reminderEnabled
+            ExamDateFilter.FEEDBACK_PENDING -> startMillis < nowMillis &&
+                (exam.exam.feedbackStatus == "PENDING" ||
+                    exam.exam.feedbackStatus == "SCHEDULED") &&
+                exam.exam.feedbackResult == null
+        }
+    }
+
+    private fun sortExams(
+        exams: List<ExamAppealListItemUi>,
+        option: ExamSortOption,
+        isPast: Boolean
+    ): List<ExamAppealListItemUi> {
+        return when (option) {
+            ExamSortOption.NEXT_UPCOMING -> if (isPast) {
+                exams.sortedByDescending { it.startMillis }
+            } else {
+                exams.sortedBy { it.startMillis }
+            }
+            ExamSortOption.COURSE_NAME_ASC -> exams.sortedBy { it.courseName.lowercase() }
+            ExamSortOption.DATE_DESC -> exams.sortedByDescending { it.startMillis }
+            ExamSortOption.FEEDBACK_STATUS -> exams.sortedWith(
+                compareByDescending<ExamAppealListItemUi> { it.needsFeedbackRegistration() }
+                    .thenByDescending { it.startMillis }
+            )
+        }
+    }
+
+    private fun countExamsThisWeek(
+        exams: List<ExamAppealListItemUi>,
+        nowMillis: Long
+    ): Int {
+        val zoneId = ZoneId.systemDefault()
+        val today = Instant.ofEpochMilli(nowMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+        val weekEnd = today.plusDays(6)
+
+        return exams.count { exam ->
+            val examDate = Instant.ofEpochMilli(exam.dayKeyMillis)
+                .atZone(zoneId)
+                .toLocalDate()
+            !examDate.isBefore(today) && !examDate.isAfter(weekEnd)
+        }
+    }
+
     private fun ExamAppealWithCourse.toListItem(nowMillis: Long): ExamAppealListItemUi {
+        val zoneId = ZoneId.systemDefault()
         val startMillis = examStartMillis(
             dateMillis = exam.dateMillis,
             timeMinutes = exam.timeMinutes
         )
+        val dayKeyMillis = Instant.ofEpochMilli(exam.dateMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+            .atStartOfDay(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
         return ExamAppealListItemUi(
             examAppealId = exam.id,
             courseId = exam.courseId,
@@ -241,8 +420,32 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
             feedbackResult = exam.feedbackResult,
             feedbackGrade = exam.feedbackGrade,
             startMillis = startMillis,
-            isPast = startMillis < nowMillis
+            isPast = startMillis < nowMillis,
+            dateMillis = exam.dateMillis,
+            dayKeyMillis = dayKeyMillis,
+            relativeDateLabel = relativeExamDateLabel(dayKeyMillis, nowMillis, zoneId)
         )
+    }
+
+    private fun relativeExamDateLabel(
+        dayKeyMillis: Long,
+        nowMillis: Long,
+        zoneId: ZoneId
+    ): String {
+        val examDate = Instant.ofEpochMilli(dayKeyMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+        val today = Instant.ofEpochMilli(nowMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+
+        return when (examDate) {
+            today -> "Oggi"
+            today.plusDays(1) -> "Domani"
+            else -> "${dayOfWeekLabel(examDate.dayOfWeek.value)}, ${
+                examDate.format(DateTimeFormatter.ofPattern("dd/MM"))
+            }"
+        }
     }
 
     private fun sourceLabel(source: String): String {
@@ -253,13 +456,13 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-private data class ExamControls(
+private data class ExamFilterState(
+    val searchQuery: String,
     val selectedCourseId: Int?,
-    val showPast: Boolean,
-    val isLoading: Boolean,
-    val errorMessage: String?,
-    val isRefreshing: Boolean,
-    val refreshMessage: String?
+    val dateFilter: ExamDateFilter,
+    val sortOption: ExamSortOption,
+    val selectedExamDayMillis: Long?,
+    val showPast: Boolean
 )
 
 private data class ExamRefreshState(

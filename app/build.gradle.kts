@@ -31,8 +31,8 @@ android {
         applicationId = "com.example.unilifeplanner"
         minSdk = 35
         targetSdk = 36
-        versionCode = 22
-        versionName = "1.1.11"
+        versionCode = 23
+        versionName = "1.1.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey

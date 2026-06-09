@@ -5,35 +5,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,14 +36,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.notifications.NotificationHelper
-import com.example.unilifeplanner.ui.components.InfoPill
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
+import com.example.unilifeplanner.ui.exams.components.ExamDaySection
+import com.example.unilifeplanner.ui.exams.components.ExamEmptyState
+import com.example.unilifeplanner.ui.exams.components.ExamFiltersSection
+import com.example.unilifeplanner.ui.exams.components.ExamTimelineItem
+import com.example.unilifeplanner.ui.exams.components.ExamsAgendaHeader
+import com.example.unilifeplanner.ui.exams.components.PastExamsHeader
+import com.example.unilifeplanner.ui.exams.components.hasActiveExamFilters
 import kotlinx.coroutines.launch
 
 @Composable
@@ -90,6 +81,19 @@ fun ExamsScreen(
         }
     )
 
+    val handleAddExam: () -> Unit = {
+        if (uiState.availableCourses.isEmpty()) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(
+                    "Aggiungi prima un corso per poter creare un appello."
+                )
+            }
+        } else {
+            onAddExamClick(uiState.selectedCourseId)
+        }
+        Unit
+    }
+
     LaunchedEffect(initialCourseId) {
         viewModel.setInitialCourseFilter(initialCourseId)
     }
@@ -120,11 +124,14 @@ fun ExamsScreen(
                         enabled = !uiState.isRefreshing
                     ) {
                         if (uiState.isRefreshing) {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
                         } else {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
-                                contentDescription = "Aggiorna da UniBo"
+                                contentDescription = "Aggiorna appelli da UniBo"
                             )
                         }
                     }
@@ -132,19 +139,7 @@ fun ExamsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (uiState.availableCourses.isEmpty()) {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(
-                                "Aggiungi prima un corso per poter creare un appello."
-                            )
-                        }
-                    } else {
-                        onAddExamClick(uiState.selectedCourseId)
-                    }
-                }
-            ) {
+            FloatingActionButton(onClick = handleAddExam) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = "Aggiungi appello"
@@ -164,10 +159,14 @@ fun ExamsScreen(
                 uiState.isLoading -> ExamsLoadingState()
                 else -> ExamsContent(
                     uiState = uiState,
-                    onAddExamClick = { onAddExamClick(uiState.selectedCourseId) },
+                    onSearchQueryChange = viewModel::onSearchQueryChange,
+                    onDateFilterChange = viewModel::onDateFilterChange,
                     onCourseFilterChange = viewModel::onCourseFilterChange,
-                    onClearCourseFilter = viewModel::clearCourseFilter,
+                    onSortOptionChange = viewModel::onSortOptionChange,
+                    onSelectedExamDayChange = viewModel::onSelectedExamDayChange,
+                    onClearFilters = viewModel::clearFilters,
                     onTogglePastExams = viewModel::togglePastExamsVisibility,
+                    onAddExamClick = handleAddExam,
                     onEditExamClick = onEditExamClick,
                     onOpenFeedbackClick = onOpenFeedbackClick,
                     onDeleteExamClick = viewModel::deleteExamAppeal,
@@ -191,39 +190,63 @@ fun ExamsScreen(
 @Composable
 private fun ExamsContent(
     uiState: ExamsUiState,
-    onAddExamClick: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onDateFilterChange: (ExamDateFilter) -> Unit,
     onCourseFilterChange: (Int?) -> Unit,
-    onClearCourseFilter: () -> Unit,
+    onSortOptionChange: (ExamSortOption) -> Unit,
+    onSelectedExamDayChange: (Long?) -> Unit,
+    onClearFilters: () -> Unit,
     onTogglePastExams: () -> Unit,
+    onAddExamClick: () -> Unit,
     onEditExamClick: (Int) -> Unit,
     onOpenFeedbackClick: (Int) -> Unit,
     onDeleteExamClick: (Int) -> Unit,
     onOpenCourseClick: (Int) -> Unit,
     onToggleReminder: (ExamAppealListItemUi, Boolean) -> Unit
 ) {
-    var showCourseFilterDialog by remember { mutableStateOf(false) }
     var pendingDeleteExam by remember { mutableStateOf<ExamAppealListItemUi?>(null) }
+    val groupedUpcoming = rememberGroupedExams(uiState.upcomingExams)
 
     LazyColumn(
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         item {
-            ExamsActionsCard(
-                selectedCourseName = uiState.selectedCourseName,
-                hasCourses = uiState.availableCourses.isNotEmpty(),
-                onAddExamClick = onAddExamClick,
-                onChooseCourseClick = { showCourseFilterDialog = true },
-                onClearCourseFilter = onClearCourseFilter
+            ExamsAgendaHeader(uiState = uiState)
+        }
+
+        item {
+            ExamFiltersSection(
+                uiState = uiState,
+                onSearchQueryChange = onSearchQueryChange,
+                onDateFilterChange = onDateFilterChange,
+                onCourseFilterChange = onCourseFilterChange,
+                onSortOptionChange = onSortOptionChange,
+                onSelectedExamDayChange = onSelectedExamDayChange,
+                onClearFilters = onClearFilters
             )
+        }
+
+        if (uiState.availableCourses.isEmpty()) {
+            item {
+                ExamEmptyState(
+                    title = "Nessun corso disponibile",
+                    message = "Aggiungi prima un corso per poter creare un appello.",
+                    primaryActionLabel = null,
+                    onPrimaryAction = null
+                )
+            }
+            return@LazyColumn
         }
 
         if (!uiState.hasAnyExams) {
             item {
-                EmptyExamsState(
+                ExamEmptyState(
                     title = "Nessun appello disponibile",
-                    message = "Gli appelli UniBo vengono importati dalla voce Universita. Qui puoi aggiungerli manualmente e gestire i promemoria."
+                    message = "Aggiungi un appello manualmente o importa i dati da UniBo.",
+                    primaryActionLabel = "Aggiungi appello",
+                    onPrimaryAction = onAddExamClick
                 )
             }
             return@LazyColumn
@@ -231,45 +254,47 @@ private fun ExamsContent(
 
         if (uiState.upcomingExams.isEmpty() && uiState.pastExams.isEmpty()) {
             item {
-                EmptyExamsState(
+                ExamEmptyState(
                     title = "Nessun appello trovato",
-                    message = "Modifica il filtro corso per vedere altri appelli."
+                    message = "Prova a modificare ricerca, data, corso o ordinamento.",
+                    primaryActionLabel = if (hasActiveExamFilters(uiState)) {
+                        "Cancella filtri"
+                    } else {
+                        null
+                    },
+                    onPrimaryAction = if (hasActiveExamFilters(uiState)) {
+                        onClearFilters
+                    } else {
+                        null
+                    }
                 )
             }
             return@LazyColumn
         }
 
-        if (uiState.upcomingExams.isNotEmpty()) {
-            item {
-                SectionHeader(text = "Prossimi appelli")
-            }
-            items(
-                items = uiState.upcomingExams,
-                key = { exam -> exam.examAppealId }
-            ) { exam ->
-                ExamAppealCard(
-                    exam = exam,
-                    onEditClick = { onEditExamClick(exam.examAppealId) },
-                    onFeedbackClick = { onOpenFeedbackClick(exam.examAppealId) },
-                    onDeleteClick = { pendingDeleteExam = exam },
-                    onOpenCourseClick = { onOpenCourseClick(exam.courseId) },
-                    onToggleReminderClick = { onToggleReminder(exam, !exam.reminderEnabled) }
-                )
-            }
+        items(
+            items = groupedUpcoming,
+            key = { group -> group.dayTitle }
+        ) { group ->
+            ExamDaySection(
+                dayTitle = group.dayTitle,
+                exams = group.exams,
+                onEditClick = { exam -> onEditExamClick(exam.examAppealId) },
+                onFeedbackClick = { exam -> onOpenFeedbackClick(exam.examAppealId) },
+                onDeleteClick = { exam -> pendingDeleteExam = exam },
+                onOpenCourseClick = onOpenCourseClick,
+                onToggleReminderClick = { exam ->
+                    onToggleReminder(exam, !exam.reminderEnabled)
+                }
+            )
         }
 
         if (uiState.pastExams.isNotEmpty()) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SectionHeader(text = "Appelli passati")
-                    TextButton(onClick = onTogglePastExams) {
-                        Text(text = if (uiState.showPastExams) "Nascondi" else "Mostra")
-                    }
-                }
+                PastExamsHeader(
+                    isExpanded = uiState.showPastExams,
+                    onToggle = onTogglePastExams
+                )
             }
         }
 
@@ -278,7 +303,7 @@ private fun ExamsContent(
                 items = uiState.pastExams,
                 key = { exam -> "past-${exam.examAppealId}" }
             ) { exam ->
-                ExamAppealCard(
+                ExamTimelineItem(
                     exam = exam,
                     onEditClick = { onEditExamClick(exam.examAppealId) },
                     onFeedbackClick = { onOpenFeedbackClick(exam.examAppealId) },
@@ -290,28 +315,22 @@ private fun ExamsContent(
         }
     }
 
-    if (showCourseFilterDialog) {
-        CourseFilterDialog(
-            courses = uiState.availableCourses,
-            onCourseSelected = { courseId ->
-                showCourseFilterDialog = false
-                onCourseFilterChange(courseId)
-            },
-            onDismiss = { showCourseFilterDialog = false }
-        )
-    }
-
     pendingDeleteExam?.let { exam ->
         AlertDialog(
             onDismissRequest = { pendingDeleteExam = null },
             title = { Text(text = "Eliminare appello?") },
-            text = { Text(text = "Vuoi eliminare questo appello?") },
+            text = {
+                Text(text = "Vuoi eliminare questo appello? Questa azione non può essere annullata.")
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
                         pendingDeleteExam = null
                         onDeleteExamClick(exam.examAppealId)
-                    }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
                 ) {
                     Text(text = "Elimina")
                 }
@@ -326,294 +345,34 @@ private fun ExamsContent(
 }
 
 @Composable
-private fun ExamsActionsCard(
-    selectedCourseName: String?,
-    hasCourses: Boolean,
-    onAddExamClick: () -> Unit,
-    onChooseCourseClick: () -> Unit,
-    onClearCourseFilter: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "Appelli d'esame",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "Gestisci gli appelli separatamente dai corsi e scegli per quali attivare il promemoria.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onAddExamClick,
-                    enabled = hasCourses,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(imageVector = Icons.Filled.Event, contentDescription = null)
-                    Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                    Text(text = "Aggiungi")
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = onChooseCourseClick,
-                    enabled = hasCourses,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Filled.School, contentDescription = null)
-                    Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                    Text(text = selectedCourseName ?: "Tutti i corsi")
-                }
-                if (selectedCourseName != null) {
-                    TextButton(onClick = onClearCourseFilter) {
-                        Text(text = "Rimuovi")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExamAppealCard(
-    exam: ExamAppealListItemUi,
-    onEditClick: () -> Unit,
-    onFeedbackClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onOpenCourseClick: () -> Unit,
-    onToggleReminderClick: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = exam.courseName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarMonth,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = listOfNotNull(exam.dateLabel, exam.timeLabel).joinToString(" - "),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-            exam.location?.takeIf { it.isNotBlank() }?.let { location ->
-                Text(
-                    text = location,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            exam.type?.takeIf { it.isNotBlank() }?.let { type ->
-                Text(
-                    text = "Tipo: $type",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            exam.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                Text(
-                    text = notes,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            exam.feedbackChipText()?.let { feedbackText ->
-                InfoPill(text = feedbackText)
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                InfoPill(text = exam.sourceLabel)
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = if (exam.reminderEnabled) {
-                                "Partecipo - promemoria attivo"
-                            } else {
-                                "Promemoria disattivato"
-                            }
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (exam.reminderEnabled) {
-                                Icons.Filled.Notifications
-                            } else {
-                                Icons.Filled.NotificationsOff
-                            },
-                            contentDescription = null
-                        )
-                    }
-                )
-            }
-            if (exam.isPast && exam.reminderEnabled && exam.feedbackResult == null) {
-                OutlinedButton(
-                    onClick = onFeedbackClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = "Registra esito")
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onEditClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "Modifica appello"
-                    )
-                }
-                IconButton(onClick = onOpenCourseClick) {
-                    Icon(
-                        imageVector = Icons.Filled.School,
-                        contentDescription = "Apri corso"
-                    )
-                }
-                IconButton(onClick = onToggleReminderClick) {
-                    Icon(
-                        imageVector = if (exam.reminderEnabled) {
-                            Icons.Filled.NotificationsOff
-                        } else {
-                            Icons.Filled.Notifications
-                        },
-                        contentDescription = if (exam.reminderEnabled) {
-                            "Disattiva promemoria appello"
-                        } else {
-                            "Attiva promemoria appello"
-                        }
-                    )
-                }
-                IconButton(onClick = onDeleteClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = "Elimina appello"
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun ExamAppealListItemUi.feedbackChipText(): String? {
-    return when (feedbackStatus) {
-        "PENDING", "SCHEDULED" -> if (isPast) "Esito da registrare" else null
-        "ANSWERED" -> when (feedbackResult) {
-            "PASSED" -> listOfNotNull("Esito: Superato", feedbackGrade?.let { "voto $it" })
-                .joinToString(" - ")
-            "FAILED" -> "Esito: Non superato"
-            "WAITING_RESULT" -> "Esito: In attesa"
-            "NOT_ATTENDED" -> "Non partecipato"
-            else -> null
-        }
-        else -> null
-    }
-}
-
-@Composable
-private fun CourseFilterDialog(
-    courses: List<ExamCourseOptionUi>,
-    onCourseSelected: (Int?) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = "Filtra per corso") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { onCourseSelected(null) }) {
-                    Text(text = "Tutti i corsi")
-                }
-                courses.forEach { course ->
-                    TextButton(onClick = { onCourseSelected(course.courseId) }) {
-                        Text(text = course.courseName)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = "Annulla")
-            }
-        }
-    )
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-    )
-}
-
-@Composable
-private fun EmptyExamsState(
-    title: String,
-    message: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 40.dp, horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Event,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth(0.16f)
-        )
-        Spacer(modifier = Modifier.padding(vertical = 8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.padding(vertical = 4.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
 private fun ExamsLoadingState() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
+    }
+}
+
+private data class ExamDayGroup(
+    val dayTitle: String,
+    val exams: List<ExamAppealListItemUi>
+)
+
+@Composable
+private fun rememberGroupedExams(exams: List<ExamAppealListItemUi>): List<ExamDayGroup> {
+    return remember(exams) {
+        exams
+            .groupBy { it.relativeDateLabel }
+            .entries
+            .sortedBy { (_, groupExams) ->
+                groupExams.minOf { it.startMillis }
+            }
+            .map { (dayTitle, groupExams) ->
+                ExamDayGroup(
+                    dayTitle = dayTitle,
+                    exams = groupExams.sortedBy { it.startMillis }
+                )
+            }
     }
 }

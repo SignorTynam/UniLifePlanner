@@ -3,15 +3,25 @@ package com.example.unilifeplanner.ui.exams
 data class ExamsUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+    val searchQuery: String = "",
     val selectedCourseId: Int? = null,
     val selectedCourseName: String? = null,
+    val selectedDateFilter: ExamDateFilter = ExamDateFilter.ALL,
+    val selectedSortOption: ExamSortOption = ExamSortOption.NEXT_UPCOMING,
+    val selectedExamDayMillis: Long? = null,
     val availableCourses: List<ExamCourseOptionUi> = emptyList(),
     val upcomingExams: List<ExamAppealListItemUi> = emptyList(),
     val pastExams: List<ExamAppealListItemUi> = emptyList(),
     val showPastExams: Boolean = false,
     val hasAnyExams: Boolean = false,
     val isRefreshing: Boolean = false,
-    val refreshMessage: String? = null
+    val refreshMessage: String? = null,
+    val filteredResultCount: Int = 0,
+    val upcomingExamCount: Int = 0,
+    val thisWeekExamCount: Int = 0,
+    val reminderExamCount: Int = 0,
+    val pendingFeedbackCount: Int = 0,
+    val examCountByDay: Map<Long, Int> = emptyMap()
 )
 
 data class ExamCourseOptionUi(
@@ -34,5 +44,8 @@ data class ExamAppealListItemUi(
     val feedbackResult: String?,
     val feedbackGrade: String?,
     val startMillis: Long,
-    val isPast: Boolean
+    val isPast: Boolean,
+    val dateMillis: Long,
+    val dayKeyMillis: Long,
+    val relativeDateLabel: String
 )
