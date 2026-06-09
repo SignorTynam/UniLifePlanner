@@ -1,13 +1,21 @@
 package com.example.unilifeplanner.ui.theme
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.graphics.Color.TRANSPARENT
 import android.os.Build
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.unilifeplanner.domain.model.ThemeMode
@@ -82,6 +90,11 @@ fun UniLifePlannerTheme(
         else -> LightColorScheme
     }
 
+    ApplySystemBarsStyle(
+        darkTheme = darkTheme,
+        colorScheme = colorScheme
+    )
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
@@ -89,3 +102,36 @@ fun UniLifePlannerTheme(
         content = content
     )
 }
+
+@Composable
+private fun ApplySystemBarsStyle(
+    darkTheme: Boolean,
+    colorScheme: ColorScheme
+) {
+    val context = LocalContext.current
+    SideEffect {
+        val activity = context.findActivity() ?: return@SideEffect
+        val statusBarStyle = if (darkTheme) {
+            SystemBarStyle.dark(TRANSPARENT)
+        } else {
+            SystemBarStyle.light(TRANSPARENT, TRANSPARENT)
+        }
+        val navigationBarStyle = if (darkTheme) {
+            SystemBarStyle.dark(TRANSPARENT)
+        } else {
+            SystemBarStyle.light(TRANSPARENT, TRANSPARENT)
+        }
+
+        activity.enableEdgeToEdge(
+            statusBarStyle = statusBarStyle,
+            navigationBarStyle = navigationBarStyle
+        )
+    }
+}
+
+private tailrec fun Context.findActivity(): ComponentActivity? =
+    when (this) {
+        is ComponentActivity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
