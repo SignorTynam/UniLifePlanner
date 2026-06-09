@@ -1,44 +1,36 @@
 package com.example.unilifeplanner.ui.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.domain.model.ThemeMode
-import com.example.unilifeplanner.ui.components.UniLifeScreenContainer
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
+import com.example.unilifeplanner.ui.settings.components.SettingsDataSection
+import com.example.unilifeplanner.ui.settings.components.SettingsHeroHeader
+import com.example.unilifeplanner.ui.settings.components.SettingsPreferencesSection
+import com.example.unilifeplanner.ui.settings.components.ThemeModeSelector
+import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 
 @Composable
 fun SettingsScreen(
@@ -46,121 +38,83 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showClearPlannerDataDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(uiState.clearPlannerDataMessage, uiState.clearPlannerDataError) {
+        val feedback = uiState.clearPlannerDataMessage ?: uiState.clearPlannerDataError
+        if (feedback != null) {
+            snackbarHostState.showSnackbar(feedback)
+            viewModel.clearPlannerDataFeedback()
+        }
+    }
+
+    SettingsScreenContent(
+        uiState = uiState,
+        snackbarHostState = snackbarHostState,
+        showClearPlannerDataDialog = showClearPlannerDataDialog,
+        onShowClearPlannerDataDialogChange = { showClearPlannerDataDialog = it },
+        onMenuClick = onMenuClick,
+        onThemeModeSelected = viewModel::onThemeModeSelected,
+        onClearPlannerDataClick = {
+            viewModel.clearPlannerDataFeedback()
+            showClearPlannerDataDialog = true
+        },
+        onConfirmClearPlannerData = {
+            showClearPlannerDataDialog = false
+            viewModel.clearPlannerData()
+        }
+    )
+}
+
+@Composable
+private fun SettingsScreenContent(
+    uiState: SettingsUiState,
+    snackbarHostState: SnackbarHostState,
+    showClearPlannerDataDialog: Boolean,
+    onShowClearPlannerDataDialogChange: (Boolean) -> Unit,
+    onMenuClick: () -> Unit,
+    onThemeModeSelected: (ThemeMode) -> Unit,
+    onClearPlannerDataClick: () -> Unit,
+    onConfirmClearPlannerData: () -> Unit
+) {
     Scaffold(
         topBar = {
             UniLifeTopBar(
                 title = "Impostazioni",
                 onMenuClick = onMenuClick
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        UniLifeScreenContainer(
-            modifier = Modifier.padding(innerPadding),
-            contentPadding = PaddingValues(20.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                top = 20.dp,
+                end = 20.dp,
+                bottom = 32.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Text(
-                text = "Aspetto",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ThemeOptionCard(
-                    title = "Tema chiaro",
-                    description = "Usa sempre il tema chiaro",
-                    selected = uiState.selectedThemeMode == ThemeMode.LIGHT,
-                    onClick = { viewModel.onThemeModeSelected(ThemeMode.LIGHT) }
-                )
-                ThemeOptionCard(
-                    title = "Tema scuro",
-                    description = "Usa sempre il tema scuro",
-                    selected = uiState.selectedThemeMode == ThemeMode.DARK,
-                    onClick = { viewModel.onThemeModeSelected(ThemeMode.DARK) }
-                )
-                ThemeOptionCard(
-                    title = "Automatico",
-                    description = "Segue le impostazioni del sistema",
-                    selected = uiState.selectedThemeMode == ThemeMode.SYSTEM,
-                    onClick = { viewModel.onThemeModeSelected(ThemeMode.SYSTEM) }
+            item {
+                SettingsHeroHeader(selectedThemeMode = uiState.selectedThemeMode)
+            }
+            item {
+                ThemeModeSelector(
+                    selectedThemeMode = uiState.selectedThemeMode,
+                    onThemeModeSelected = onThemeModeSelected
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Preferenze",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    headlineContent = { Text(text = "Notifiche") },
-                    supportingContent = { Text(text = "Placeholder non attivo") }
-                )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text(text = "Preferiti") },
-                    supportingContent = { Text(text = "Gestione disponibile nella sezione corsi") }
-                )
+            item {
+                SettingsPreferencesSection()
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Dati applicazione",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ListItem(
-                    modifier = Modifier.clickable(
-                        enabled = !uiState.isClearingPlannerData,
-                        onClick = {
-                            viewModel.clearPlannerDataFeedback()
-                            showClearPlannerDataDialog = true
-                        }
-                    ),
-                    leadingContent = {
-                        if (uiState.isClearingPlannerData) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    headlineContent = {
-                        Text(
-                            text = if (uiState.isClearingPlannerData) {
-                                "Cancellazione in corso..."
-                            } else {
-                                "Cancella dati del planner"
-                            },
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    supportingContent = {
-                        Text(
-                            text = "Elimina corsi, lezioni, esami, preferiti e dati importati. Non elimina account, profilo, email o tema."
-                        )
-                    }
-                )
-            }
-
-            uiState.clearPlannerDataMessage?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            uiState.clearPlannerDataError?.let { error ->
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
+            item {
+                SettingsDataSection(
+                    isClearingPlannerData = uiState.isClearingPlannerData,
+                    onClearPlannerDataClick = onClearPlannerDataClick
                 )
             }
         }
@@ -170,96 +124,94 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = {
                 if (!uiState.isClearingPlannerData) {
-                    showClearPlannerDataDialog = false
+                    onShowClearPlannerDataDialogChange(false)
                 }
             },
-            title = { Text(text = "Cancellare i dati del planner?") },
+            title = {
+                Text(
+                    text = "Cancellare i dati del planner?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Text(
-                    text = "Questa azione eliminerà corsi, lezioni, esami, preferiti e dati importati. Account, profilo e impostazioni personali resteranno invariati. L'azione non può essere annullata."
+                    text = "Questa azione eliminerà corsi, lezioni, appelli d'esame, preferiti, dati importati e promemoria collegati. Account, profilo, email e tema resteranno invariati. L'azione non può essere annullata."
                 )
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showClearPlannerDataDialog = false
-                        viewModel.clearPlannerData()
-                    },
+                TextButton(
+                    onClick = onConfirmClearPlannerData,
                     enabled = !uiState.isClearingPlannerData
                 ) {
-                    Text(text = "Cancella dati")
+                    Text(
+                        text = "Cancella dati",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showClearPlannerDataDialog = false },
+                    onClick = { onShowClearPlannerDataDialogChange(false) },
                     enabled = !uiState.isClearingPlannerData
                 ) {
                     Text(text = "Annulla")
                 }
-            },
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            titleContentColor = MaterialTheme.colorScheme.onErrorContainer,
-            textContentColor = MaterialTheme.colorScheme.onErrorContainer
+            }
         )
     }
 }
 
+@Preview(showBackground = true)
 @Composable
-private fun ThemeOptionCard(
-    title: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                role = Role.RadioButton,
-                onClick = onClick
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+private fun SettingsScreenLightPreview() {
+    UniLifePlannerTheme {
+        SettingsScreenContent(
+            uiState = SettingsUiState(selectedThemeMode = ThemeMode.LIGHT),
+            snackbarHostState = remember { SnackbarHostState() },
+            showClearPlannerDataDialog = false,
+            onShowClearPlannerDataDialogChange = {},
+            onMenuClick = {},
+            onThemeModeSelected = {},
+            onClearPlannerDataClick = {},
+            onConfirmClearPlannerData = {}
         )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-            }
+    }
+}
 
-            RadioButton(
-                selected = selected,
-                onClick = onClick
-            )
-        }
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenClearingPreview() {
+    UniLifePlannerTheme {
+        SettingsScreenContent(
+            uiState = SettingsUiState(
+                selectedThemeMode = ThemeMode.SYSTEM,
+                isClearingPlannerData = true
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            showClearPlannerDataDialog = true,
+            onShowClearPlannerDataDialogChange = {},
+            onMenuClick = {},
+            onThemeModeSelected = {},
+            onClearPlannerDataClick = {},
+            onConfirmClearPlannerData = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenDarkPreview() {
+    UniLifePlannerTheme(themeMode = ThemeMode.DARK) {
+        SettingsScreenContent(
+            uiState = SettingsUiState(selectedThemeMode = ThemeMode.DARK),
+            snackbarHostState = remember { SnackbarHostState() },
+            showClearPlannerDataDialog = false,
+            onShowClearPlannerDataDialogChange = {},
+            onMenuClick = {},
+            onThemeModeSelected = {},
+            onClearPlannerDataClick = {},
+            onConfirmClearPlannerData = {}
+        )
     }
 }
