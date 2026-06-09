@@ -165,7 +165,16 @@ fun AppNavigation(
 
             composable(Screen.Home.route) {
                 HomeScreen(
-                    onMenuClick = onOpenDrawer
+                    onMenuClick = onOpenDrawer,
+                    onOpenCoursesClick = { navigateToTopLevel(Screen.Courses.route, true) },
+                    onOpenLessonsClick = { navigateToTopLevel(Screen.Lessons.createRoute(), true) },
+                    onOpenExamsClick = { navigateToTopLevel(Screen.Exams.createRoute(), false) },
+                    onOpenStatisticsClick = { navigateToTopLevel(Screen.Statistics.route, true) },
+                    onOpenUniboImportClick = { navigateToTopLevel(Screen.PublicUniboImport.route, true) },
+                    onOpenProfileClick = { navigateToTopLevel(Screen.Profile.route, true) },
+                    onOpenCourseClick = { courseId ->
+                        navController.navigate(Screen.CourseDetail.createRoute(courseId))
+                    }
                 )
             }
 

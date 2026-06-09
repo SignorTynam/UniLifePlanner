@@ -1,61 +1,67 @@
 package com.example.unilifeplanner.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PendingActions
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.unilifeplanner.ui.components.UniLifeProfileAvatar
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
+import com.example.unilifeplanner.ui.home.components.HomeFavoriteCoursesSection
+import com.example.unilifeplanner.ui.home.components.HomeHeroHeader
+import com.example.unilifeplanner.ui.home.components.HomeInsightsSection
+import com.example.unilifeplanner.ui.home.components.HomeOnboardingEmptyState
+import com.example.unilifeplanner.ui.home.components.HomeProgressOverview
+import com.example.unilifeplanner.ui.home.components.HomeQuickActionsSection
+import com.example.unilifeplanner.ui.home.components.HomeTodayAgendaSection
+import com.example.unilifeplanner.ui.home.components.HomeUpcomingSection
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 
 @Composable
 fun HomeScreen(
     onMenuClick: () -> Unit,
+    onOpenCoursesClick: () -> Unit,
+    onOpenLessonsClick: () -> Unit,
+    onOpenExamsClick: () -> Unit,
+    onOpenStatisticsClick: () -> Unit,
+    onOpenUniboImportClick: () -> Unit,
+    onOpenProfileClick: () -> Unit,
+    onOpenCourseClick: (Int) -> Unit,
     homeViewModel: HomeViewModel = viewModel()
 ) {
     val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
 
     HomeScreenContent(
         uiState = uiState,
-        onMenuClick = onMenuClick
+        onMenuClick = onMenuClick,
+        onOpenCoursesClick = onOpenCoursesClick,
+        onOpenLessonsClick = onOpenLessonsClick,
+        onOpenExamsClick = onOpenExamsClick,
+        onOpenStatisticsClick = onOpenStatisticsClick,
+        onOpenUniboImportClick = onOpenUniboImportClick,
+        onOpenProfileClick = onOpenProfileClick,
+        onOpenCourseClick = onOpenCourseClick
     )
 }
 
 @Composable
 private fun HomeScreenContent(
     uiState: HomeSummaryUiState,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    onOpenCoursesClick: () -> Unit,
+    onOpenLessonsClick: () -> Unit,
+    onOpenExamsClick: () -> Unit,
+    onOpenStatisticsClick: () -> Unit,
+    onOpenUniboImportClick: () -> Unit,
+    onOpenProfileClick: () -> Unit,
+    onOpenCourseClick: (Int) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -66,347 +72,99 @@ private fun HomeScreenContent(
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.padding(innerPadding),
-            contentPadding = PaddingValues(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                top = 20.dp,
+                end = 20.dp,
+                bottom = 32.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             item {
-                WelcomeSection(
+                HomeHeroHeader(
                     firstName = uiState.firstName,
                     lastName = uiState.lastName,
-                    profileImageUri = uiState.profileImageUri
+                    profileImageUri = uiState.profileImageUri,
+                    todayCommitmentsCount = uiState.todayCommitmentsCount
                 )
             }
+
             if (uiState.totalCourses == 0) {
                 item {
-                    EmptyStateCard(
-                        title = "Nessun corso registrato",
-                        message = "Apri il menu laterale e scegli Corsi per aggiungere il tuo primo corso."
+                    HomeOnboardingEmptyState(
+                        onOpenUniboImportClick = onOpenUniboImportClick,
+                        onOpenCoursesClick = onOpenCoursesClick
                     )
                 }
-            }
-            item {
-                NextExamCard(nextExam = uiState.nextExam)
-            }
-            item {
-                NextLessonCard(nextLesson = uiState.nextLesson)
-            }
-            item {
-                StudySummaryCard(uiState = uiState)
-            }
-            item {
-                FavoriteCoursesSection(favoriteCourses = uiState.favoriteCourses)
-            }
-        }
-    }
-}
-
-@Composable
-fun WelcomeSection(
-    firstName: String,
-    lastName: String,
-    profileImageUri: String?,
-    modifier: Modifier = Modifier
-) {
-    val displayName = listOf(firstName.trim(), lastName.trim())
-        .filter { it.isNotBlank() }
-        .joinToString(" ")
-        .ifBlank { "studente" }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            UniLifeProfileAvatar(
-                profileImageUri = profileImageUri,
-                size = 64.dp,
-                modifier = Modifier.size(64.dp)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Ciao, $displayName",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Organizza corsi, esami e scadenze in un unico posto.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun StudySummaryCard(
-    uiState: HomeSummaryUiState,
-    modifier: Modifier = Modifier
-) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Riepilogo studio",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SummaryItem(
-                    label = "Totali",
-                    value = uiState.totalCourses.toString(),
-                    icon = Icons.Filled.School,
-                    modifier = Modifier.weight(1f)
-                )
-                SummaryItem(
-                    label = "Completati",
-                    value = uiState.completedCourses.toString(),
-                    icon = Icons.Filled.CheckCircle,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SummaryItem(
-                    label = "In corso",
-                    value = uiState.inProgressCourses.toString(),
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
-                    modifier = Modifier.weight(1f)
-                )
-                SummaryItem(
-                    label = "Da studiare",
-                    value = uiState.toStudyCourses.toString(),
-                    icon = Icons.Filled.PendingActions,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SummaryItem(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun NextExamCard(
-    nextExam: NextExamUi?,
-    modifier: Modifier = Modifier
-) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "Prossimo esame",
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            if (nextExam == null) {
-                EmptyStateCard(
-                    title = "Nessun esame programmato",
-                    message = "Aggiungi un appello dalla schermata Esami per visualizzarlo qui."
-                )
+                item {
+                    HomeQuickActionsSection(
+                        onOpenCoursesClick = onOpenCoursesClick,
+                        onOpenLessonsClick = onOpenLessonsClick,
+                        onOpenExamsClick = onOpenExamsClick,
+                        onOpenStatisticsClick = onOpenStatisticsClick,
+                        onOpenUniboImportClick = onOpenUniboImportClick,
+                        onOpenProfileClick = onOpenProfileClick
+                    )
+                }
             } else {
-                Text(
-                    text = nextExam.courseName,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Data: ${nextExam.examDate}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                FilledTonalButton(onClick = {}) {
-                    Text(text = nextExam.status)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun NextLessonCard(
-    nextLesson: NextLessonUi?,
-    modifier: Modifier = Modifier
-) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Schedule,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Text(
-                    text = "Prossima lezione",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            if (nextLesson == null) {
-                Text(
-                    text = "Nessuna lezione programmata",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Aggiungi le lezioni dalla schermata Lezioni.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Text(
-                    text = "${nextLesson.dayAndTime} - ${nextLesson.courseName}",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                nextLesson.location?.let { location ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                item {
+                    HomeTodayAgendaSection(
+                        todayLessons = uiState.todayLessons,
+                        todayExams = uiState.todayExams,
+                        todayCommitmentsCount = uiState.todayCommitmentsCount
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun FavoriteCoursesSection(
-    favoriteCourses: List<FavoriteCourseUi>,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "Preferiti",
-            style = MaterialTheme.typography.titleLarge
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        if (favoriteCourses.isEmpty()) {
-            EmptyStateCard(
-                title = "Nessun corso preferito",
-                message = "Tocca la stellina su un corso per salvarlo tra i preferiti."
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                favoriteCourses.forEach { course ->
-                    FavoriteCourseItem(course = course)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun FavoriteCourseItem(
-    course: FavoriteCourseUi,
-    modifier: Modifier = Modifier
-) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Bookmark,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = course.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = course.professor,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                course.examDate?.let { examDate ->
-                    Text(
-                        text = "Esame: $examDate",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                item {
+                    HomeUpcomingSection(
+                        nextLesson = uiState.nextLesson,
+                        nextExam = uiState.nextExam,
+                        onOpenLessonsClick = onOpenLessonsClick,
+                        onOpenExamsClick = onOpenExamsClick
                     )
                 }
+                item {
+                    HomeProgressOverview(
+                        totalCourses = uiState.totalCourses,
+                        completedCourses = uiState.completedCourses,
+                        inProgressCourses = uiState.inProgressCourses,
+                        toStudyCourses = uiState.toStudyCourses,
+                        favoriteCourseCount = uiState.favoriteCourseCount,
+                        totalCredits = uiState.totalCredits,
+                        completedCredits = uiState.completedCredits,
+                        completionPercentage = uiState.completionPercentage
+                    )
+                }
+                item {
+                    HomeQuickActionsSection(
+                        onOpenCoursesClick = onOpenCoursesClick,
+                        onOpenLessonsClick = onOpenLessonsClick,
+                        onOpenExamsClick = onOpenExamsClick,
+                        onOpenStatisticsClick = onOpenStatisticsClick,
+                        onOpenUniboImportClick = onOpenUniboImportClick,
+                        onOpenProfileClick = onOpenProfileClick
+                    )
+                }
+                item {
+                    HomeFavoriteCoursesSection(
+                        favoriteCourses = uiState.favoriteCourses,
+                        onOpenCourseClick = onOpenCourseClick,
+                        onOpenCoursesClick = onOpenCoursesClick
+                    )
+                }
+                item {
+                    HomeInsightsSection(insights = uiState.insights)
+                }
             }
-        }
-    }
-}
-
-@Composable
-fun EmptyStateCard(
-    title: String,
-    message: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-private fun HomeScreenPreview() {
+private fun HomeScreenFullPreview() {
     UniLifePlannerTheme {
         HomeScreenContent(
             uiState = HomeSummaryUiState(
@@ -417,14 +175,53 @@ private fun HomeScreenPreview() {
                 completedCourses = 2,
                 inProgressCourses = 3,
                 toStudyCourses = 1,
+                favoriteCourseCount = 2,
+                totalCredits = 48,
+                completedCredits = 18,
+                completionPercentage = 37,
+                todayLessonCount = 2,
+                todayExamCount = 1,
+                todayCommitmentsCount = 3,
+                todayLessons = listOf(
+                    HomeLessonPreviewUi(
+                        lessonId = 1,
+                        courseId = 1,
+                        courseName = "Basi di dati",
+                        timeLabel = "09:00",
+                        location = "Aula B2"
+                    ),
+                    HomeLessonPreviewUi(
+                        lessonId = 2,
+                        courseId = 2,
+                        courseName = "Sistemi operativi",
+                        timeLabel = "14:00",
+                        location = "Lab 3"
+                    )
+                ),
+                todayExams = listOf(
+                    HomeExamPreviewUi(
+                        examAppealId = 1,
+                        courseId = 3,
+                        courseName = "Analisi matematica",
+                        dateTimeLabel = "11:00",
+                        reminderEnabled = true
+                    )
+                ),
                 nextExam = NextExamUi(
+                    examAppealId = 1,
+                    courseId = 3,
                     courseName = "Algoritmi e strutture dati",
-                    examDate = "24 giugno 2026",
-                    status = "Da preparare"
+                    examDate = "24 giugno 2026 09:00",
+                    relativeDateLabel = "Domani",
+                    status = "Promemoria attivo",
+                    reminderEnabled = true
                 ),
                 nextLesson = NextLessonUi(
+                    lessonId = 1,
+                    courseId = 1,
                     courseName = "Basi di dati",
                     dayAndTime = "Domani, 09:00",
+                    relativeDayLabel = "Domani",
                     location = "Aula B2 - Polo Fibonacci"
                 ),
                 favoriteCourses = listOf(
@@ -432,17 +229,75 @@ private fun HomeScreenPreview() {
                         id = 1,
                         name = "Analisi matematica",
                         professor = "Prof. Rossi",
-                        examDate = "12 luglio 2026"
+                        examDate = "12 luglio 2026 09:00"
                     ),
                     FavoriteCourseUi(
                         id = 2,
                         name = "Basi di dati",
                         professor = "Prof.ssa Verdi",
-                        examDate = "Da definire"
+                        examDate = null
                     )
+                ),
+                insights = listOf(
+                    "Hai 3 impegni oggi.",
+                    "Il prossimo esame è Algoritmi e strutture dati (Domani).",
+                    "Hai 1 corso ancora da iniziare."
                 )
             ),
-            onMenuClick = {}
+            onMenuClick = {},
+            onOpenCoursesClick = {},
+            onOpenLessonsClick = {},
+            onOpenExamsClick = {},
+            onOpenStatisticsClick = {},
+            onOpenUniboImportClick = {},
+            onOpenProfileClick = {},
+            onOpenCourseClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenEmptyPreview() {
+    UniLifePlannerTheme {
+        HomeScreenContent(
+            uiState = HomeSummaryUiState(
+                firstName = "Studente",
+                insights = listOf("Aggiungi o importa corsi per costruire la dashboard.")
+            ),
+            onMenuClick = {},
+            onOpenCoursesClick = {},
+            onOpenLessonsClick = {},
+            onOpenExamsClick = {},
+            onOpenStatisticsClick = {},
+            onOpenUniboImportClick = {},
+            onOpenProfileClick = {},
+            onOpenCourseClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenLongNamePreview() {
+    UniLifePlannerTheme {
+        HomeScreenContent(
+            uiState = HomeSummaryUiState(
+                firstName = "Alessandro Massimiliano",
+                lastName = "Rossi Bianchi Verdi",
+                totalCourses = 2,
+                toStudyCourses = 2,
+                totalCredits = 18,
+                insights = listOf("Hai 2 corsi ancora da iniziare.")
+            ),
+            onMenuClick = {},
+            onOpenCoursesClick = {},
+            onOpenLessonsClick = {},
+            onOpenExamsClick = {},
+            onOpenStatisticsClick = {},
+            onOpenUniboImportClick = {},
+            onOpenProfileClick = {},
+            onOpenCourseClick = {}
         )
     }
 }
