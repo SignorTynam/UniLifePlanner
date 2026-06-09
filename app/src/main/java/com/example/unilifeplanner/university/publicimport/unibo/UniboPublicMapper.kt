@@ -30,6 +30,7 @@ class UniboPublicMapper {
             externalId = teaching.externalId,
             sourceProvider = UniboPublicConfig.PROVIDER,
             officialUrl = teaching.officialUrl,
+            studyYear = teaching.studyYear,
             createdAt = nowMillis,
             updatedAt = nowMillis
         )

@@ -3,6 +3,7 @@ package com.example.unilifeplanner.data.datastore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -26,6 +27,8 @@ data class SavedUniboImportSelection(
     val degreeProgramType: String?,
     val academicYear: String,
     val degreeProgramOfficialUrl: String,
+    val degreeProgramDurationYears: Int?,
+    val selectedStudyYear: Int?,
     val curriculumExternalId: String?,
     val curriculumName: String?,
     val curriculumOfficialUrl: String?,
@@ -62,6 +65,8 @@ class UniboImportDataStore(
                 degreeProgramType = preferences[DEGREE_PROGRAM_TYPE]?.takeIf { it.isNotBlank() },
                 academicYear = academicYear,
                 degreeProgramOfficialUrl = officialUrl,
+                degreeProgramDurationYears = preferences[DEGREE_PROGRAM_DURATION_YEARS],
+                selectedStudyYear = preferences[SELECTED_STUDY_YEAR],
                 curriculumExternalId = preferences[CURRICULUM_EXTERNAL_ID]?.takeIf { it.isNotBlank() },
                 curriculumName = preferences[CURRICULUM_NAME]?.takeIf { it.isNotBlank() },
                 curriculumOfficialUrl = preferences[CURRICULUM_OFFICIAL_URL]?.takeIf { it.isNotBlank() },
@@ -89,6 +94,8 @@ class UniboImportDataStore(
             putOptional(preferences, DEGREE_PROGRAM_TYPE, degreeProgram.degreeType)
             preferences[ACADEMIC_YEAR] = degreeProgram.academicYear
             preferences[DEGREE_PROGRAM_OFFICIAL_URL] = degreeProgram.officialUrl
+            putOptional(preferences, DEGREE_PROGRAM_DURATION_YEARS, degreeProgram.durationYears)
+            putOptional(preferences, SELECTED_STUDY_YEAR, preview.selectedStudyYear)
             putOptional(preferences, CURRICULUM_EXTERNAL_ID, preview.curriculum?.externalId)
             putOptional(preferences, CURRICULUM_NAME, preview.curriculum?.name)
             putOptional(preferences, CURRICULUM_OFFICIAL_URL, preview.curriculum?.officialUrl)
@@ -125,6 +132,18 @@ class UniboImportDataStore(
         }
     }
 
+    private fun putOptional(
+        preferences: MutablePreferences,
+        key: Preferences.Key<Int>,
+        value: Int?
+    ) {
+        if (value == null) {
+            preferences.remove(key)
+        } else {
+            preferences[key] = value
+        }
+    }
+
     private companion object {
         val DEGREE_PROGRAM_EXTERNAL_ID = stringPreferencesKey("degree_program_external_id")
         val DEGREE_PROGRAM_NAME = stringPreferencesKey("degree_program_name")
@@ -132,6 +151,8 @@ class UniboImportDataStore(
         val DEGREE_PROGRAM_TYPE = stringPreferencesKey("degree_program_type")
         val ACADEMIC_YEAR = stringPreferencesKey("academic_year")
         val DEGREE_PROGRAM_OFFICIAL_URL = stringPreferencesKey("degree_program_official_url")
+        val DEGREE_PROGRAM_DURATION_YEARS = intPreferencesKey("degree_program_duration_years")
+        val SELECTED_STUDY_YEAR = intPreferencesKey("selected_study_year")
         val CURRICULUM_EXTERNAL_ID = stringPreferencesKey("curriculum_external_id")
         val CURRICULUM_NAME = stringPreferencesKey("curriculum_name")
         val CURRICULUM_OFFICIAL_URL = stringPreferencesKey("curriculum_official_url")

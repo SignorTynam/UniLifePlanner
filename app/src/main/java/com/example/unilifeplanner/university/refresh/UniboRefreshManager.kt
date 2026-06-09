@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 data class UniboRefreshResult(
     val refreshed: Boolean,
     val noSelection: Boolean = false,
+    val requiresStudyYearSelection: Boolean = false,
     val importedTeachings: Int = 0,
     val updatedTeachings: Int = 0,
     val importedLessons: Int = 0,
@@ -69,9 +70,18 @@ class UniboRefreshManager(
                 message = "Prima importa i dati da Universita."
             )
 
+        if (selection.selectedStudyYear == null) {
+            return UniboRefreshResult(
+                refreshed = false,
+                requiresStudyYearSelection = true,
+                message = "Apri Universita e scegli l'anno di corso per aggiornare l'import UniBo."
+            )
+        }
+
         val preview = importRepository.loadPreview(
             degreeProgram = selection.toDegreeProgram(),
             curriculum = selection.toCurriculum(),
+            selectedStudyYear = selection.selectedStudyYear,
             forceRefresh = force
         )
         val importResult = importRepository.importPreview(preview)
@@ -146,7 +156,8 @@ class UniboRefreshManager(
             campus = degreeProgramCampus,
             degreeType = degreeProgramType,
             academicYear = academicYear,
-            officialUrl = degreeProgramOfficialUrl
+            officialUrl = degreeProgramOfficialUrl,
+            durationYears = degreeProgramDurationYears
         )
 
     private fun SavedUniboImportSelection.toCurriculum(): PublicCurriculum? {

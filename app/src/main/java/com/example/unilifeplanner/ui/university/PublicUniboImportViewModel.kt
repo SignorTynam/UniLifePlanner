@@ -13,6 +13,7 @@ import com.example.unilifeplanner.notifications.LessonReminderScheduler
 import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicImportStatus
+import com.example.unilifeplanner.university.publicimport.availableStudyYearOptions
 import com.example.unilifeplanner.university.publicimport.unibo.UniboPublicImportException
 import com.example.unilifeplanner.university.publicimport.unibo.UniboPublicImportRepository
 import com.example.unilifeplanner.university.publicimport.unibo.UniboPublicImporter
@@ -62,6 +63,8 @@ class PublicUniboImportViewModel(
                     selectedDegreeProgram = null,
                     curricula = emptyList(),
                     selectedCurriculum = null,
+                    availableStudyYears = emptyList(),
+                    selectedStudyYear = null,
                     preview = null,
                     importResult = null,
                     errorMessage = null
@@ -100,6 +103,8 @@ class PublicUniboImportViewModel(
                     selectedDegreeProgram = degreeProgram,
                     curricula = emptyList(),
                     selectedCurriculum = null,
+                    availableStudyYears = emptyList(),
+                    selectedStudyYear = null,
                     preview = null,
                     importResult = null,
                     errorMessage = null
@@ -118,7 +123,7 @@ class PublicUniboImportViewModel(
                     }
                 } else {
                     val curriculum = curricula.singleOrNull()
-                    loadPreviewFor(
+                    showStudyYearSelection(
                         degreeProgram = degreeProgram,
                         curriculum = curriculum,
                         knownCurricula = curricula
@@ -140,8 +145,9 @@ class PublicUniboImportViewModel(
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
-                    status = PublicImportStatus.LoadingPreview,
+                    status = PublicImportStatus.StudyYearSelection,
                     selectedCurriculum = curriculum,
+                    selectedStudyYear = null,
                     preview = null,
                     importResult = null,
                     errorMessage = null
@@ -149,10 +155,32 @@ class PublicUniboImportViewModel(
             }
 
             try {
-                loadPreviewFor(
+                showStudyYearSelection(
                     degreeProgram = degreeProgram,
                     curriculum = curriculum,
                     knownCurricula = _uiState.value.curricula
+                )
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        status = PublicImportStatus.Error,
+                        errorMessage = exception.toUserMessage()
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectStudyYear(year: Int) {
+        val state = _uiState.value
+        val degreeProgram = state.selectedDegreeProgram ?: return
+        viewModelScope.launch {
+            try {
+                loadPreviewFor(
+                    degreeProgram = degreeProgram,
+                    curriculum = state.selectedCurriculum,
+                    selectedStudyYear = year,
+                    knownCurricula = state.curricula
                 )
             } catch (exception: Exception) {
                 _uiState.update {
@@ -216,6 +244,7 @@ class PublicUniboImportViewModel(
     private suspend fun loadPreviewFor(
         degreeProgram: PublicDegreeProgram,
         curriculum: PublicCurriculum?,
+        selectedStudyYear: Int,
         knownCurricula: List<PublicCurriculum>
     ) {
         _uiState.update {
@@ -224,6 +253,7 @@ class PublicUniboImportViewModel(
                 selectedDegreeProgram = degreeProgram,
                 curricula = knownCurricula,
                 selectedCurriculum = curriculum,
+                selectedStudyYear = selectedStudyYear,
                 preview = null,
                 importResult = null,
                 errorMessage = null
@@ -231,12 +261,33 @@ class PublicUniboImportViewModel(
         }
         val preview = repository.loadPreview(
             degreeProgram = degreeProgram,
-            curriculum = curriculum
+            curriculum = curriculum,
+            selectedStudyYear = selectedStudyYear
         )
         _uiState.update {
             it.copy(
                 status = PublicImportStatus.Preview,
                 preview = preview,
+                errorMessage = null
+            )
+        }
+    }
+
+    private fun showStudyYearSelection(
+        degreeProgram: PublicDegreeProgram,
+        curriculum: PublicCurriculum?,
+        knownCurricula: List<PublicCurriculum>
+    ) {
+        _uiState.update {
+            it.copy(
+                status = PublicImportStatus.StudyYearSelection,
+                selectedDegreeProgram = degreeProgram,
+                curricula = knownCurricula,
+                selectedCurriculum = curriculum,
+                availableStudyYears = degreeProgram.availableStudyYearOptions(),
+                selectedStudyYear = null,
+                preview = null,
+                importResult = null,
                 errorMessage = null
             )
         }
@@ -249,6 +300,8 @@ class PublicUniboImportViewModel(
             selectedDegreeProgram = null,
             curricula = emptyList(),
             selectedCurriculum = null,
+            availableStudyYears = emptyList(),
+            selectedStudyYear = null,
             preview = null,
             importResult = null,
             errorMessage = null

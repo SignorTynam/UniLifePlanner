@@ -52,6 +52,8 @@ import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
 import com.example.unilifeplanner.university.publicimport.PublicImportStatus
 import com.example.unilifeplanner.university.publicimport.PublicTeaching
+import com.example.unilifeplanner.university.publicimport.StudyYearOption
+import com.example.unilifeplanner.university.publicimport.formatStudyYearLabel
 
 @Composable
 fun PublicUniboImportScreen(
@@ -70,6 +72,7 @@ fun PublicUniboImportScreen(
         onLoadDegreeProgramsClick = viewModel::loadDegreePrograms,
         onDegreeProgramClick = viewModel::selectDegreeProgram,
         onCurriculumClick = viewModel::selectCurriculum,
+        onStudyYearClick = viewModel::selectStudyYear,
         onImportClick = viewModel::importPreview,
         onGoToCoursesClick = onGoToCoursesClick,
         onImportAnotherClick = viewModel::resetForAnotherImport
@@ -86,6 +89,7 @@ private fun PublicUniboImportContent(
     onLoadDegreeProgramsClick: () -> Unit,
     onDegreeProgramClick: (PublicDegreeProgram) -> Unit,
     onCurriculumClick: (PublicCurriculum) -> Unit,
+    onStudyYearClick: (Int) -> Unit,
     onImportClick: () -> Unit,
     onGoToCoursesClick: () -> Unit,
     onImportAnotherClick: () -> Unit
@@ -134,6 +138,14 @@ private fun PublicUniboImportContent(
                     CurriculumSection(
                         curricula = uiState.curricula,
                         onCurriculumClick = onCurriculumClick
+                    )
+                }
+                PublicImportStatus.StudyYearSelection -> {
+                    uiState.selectedDegreeProgram?.let { SelectedDegreeProgramCard(it) }
+                    uiState.selectedCurriculum?.let { SelectedCurriculumCard(it) }
+                    StudyYearSection(
+                        options = uiState.availableStudyYears,
+                        onStudyYearClick = onStudyYearClick
                     )
                 }
                 PublicImportStatus.LoadingPreview -> {
@@ -185,6 +197,11 @@ private fun HeaderSection() {
         )
         Text(
             text = "Importa insegnamenti, lezioni/laboratori e appelli d'esame pubblici senza collegare l'account studente.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "L'import viene limitato all'anno di corso che selezioni.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -388,6 +405,33 @@ private fun SelectedCurriculumCard(curriculum: PublicCurriculum) {
 }
 
 @Composable
+private fun StudyYearSection(
+    options: List<StudyYearOption>,
+    onStudyYearClick: (Int) -> Unit
+) {
+    Text(
+        text = "In quale anno sei?",
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.SemiBold
+    )
+    UniLifeCard {
+        Text(
+            text = "Scegli l'anno di corso per importare solo insegnamenti, lezioni e appelli collegati al tuo anno.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        options.forEach { option ->
+            Button(
+                onClick = { onStudyYearClick(option.year) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = option.label)
+            }
+        }
+    }
+}
+
+@Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun DegreeProgramResultCard(
     degreeProgram: PublicDegreeProgram,
@@ -453,6 +497,9 @@ private fun PreviewSection(
         preview.curriculum?.let { curriculum ->
             Text(text = "Curriculum: ${curriculum.name}")
         }
+        preview.selectedStudyYear?.let { studyYear ->
+            Text(text = "Anno scelto: ${formatStudyYearLabel(studyYear)}")
+        }
         Text(text = "${preview.teachings.size} insegnamenti trovati")
         Text(text = "${preview.lessons.size} lezioni trovate")
         Text(text = "${preview.examAppeals.size} appelli d'esame trovati")
@@ -507,6 +554,9 @@ private fun TeachingPreviewCard(
             text = "CFU: ${teaching.credits ?: 0}",
             style = MaterialTheme.typography.bodyMedium
         )
+        teaching.studyYear?.let { studyYear ->
+            InfoPill(text = formatStudyYearLabel(studyYear))
+        }
         Text(
             text = "Docente: ${teaching.professor ?: "Docente non indicato"}",
             style = MaterialTheme.typography.bodyMedium,

@@ -76,12 +76,19 @@ class UniboPublicParser {
 
     fun parseTeachingsFromDegreeProgramPage(
         html: String,
-        degreeProgram: PublicDegreeProgram
+        degreeProgram: PublicDegreeProgram,
+        selectedStudyYear: Int? = null
     ): List<PublicTeaching> {
         val document = Jsoup.parse(html, UniboPublicConfig.COURSE_SITE_BASE_URL)
         val result = linkedMapOf<String, PublicTeaching>()
+        val rowYears = document.resolveTeachingRowStudyYears()
 
         document.select(TEACHING_ROW_SELECTOR).forEach { row ->
+            val studyYear = rowYears[row] ?: row.findNearbyStudyYear()
+            if (selectedStudyYear != null && studyYear != selectedStudyYear) {
+                return@forEach
+            }
+
             val code = row.selectFirst(CODE_CELL_SELECTOR)?.text().cleanOrNull()
             val name = row.selectFirst(TITLE_CELL_SELECTOR)
                 ?.text()
@@ -113,7 +120,8 @@ class UniboPublicParser {
                     professor = null,
                     credits = credits,
                     academicYear = degreeProgram.academicYear,
-                    officialUrl = null
+                    officialUrl = null,
+                    studyYear = studyYear
                 )
             )
         }
@@ -335,10 +343,11 @@ class UniboPublicParser {
             ?: return null
         val campus = findLabeledValue("Sede didattica")
         val duration = findLabeledValue("Durata")
+        val durationYears = parseDurationYears(duration)
         val normalizedUrl = officialUrl.lowercase()
         val degreeType = when {
             normalizedUrl.contains("/lauree-magistrali/") -> "Laurea Magistrale"
-            duration?.contains("5") == true -> "Laurea Magistrale a Ciclo Unico"
+            durationYears != null && durationYears >= 5 -> "Laurea Magistrale a Ciclo Unico"
             else -> "Laurea"
         }
 
@@ -348,8 +357,97 @@ class UniboPublicParser {
             campus = campus,
             degreeType = degreeType,
             academicYear = academicYear,
-            officialUrl = officialUrl
+            officialUrl = officialUrl,
+            durationYears = durationYears
         )
+    }
+
+    internal fun parseDurationYears(value: String?): Int? {
+        val normalized = normalizeText(value.orEmpty())
+        return "\\b([1-6])\\s+anni\\b".toRegex()
+            .find(normalized)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+    }
+
+    internal fun parseStudyYearFromText(text: String): Int? {
+        val normalized = normalizeText(text)
+        WORD_STUDY_YEARS.forEach { (word, year) ->
+            if ("\\b$word\\s+anno\\b".toRegex().containsMatchIn(normalized)) return year
+        }
+        ROMAN_STUDY_YEARS.forEach { (roman, year) ->
+            if ("\\b$roman\\s+anno\\b".toRegex().containsMatchIn(normalized)) return year
+        }
+
+        val patterns = listOf(
+            "\\banno\\s+di\\s+corso\\s*:?\\s*([1-6])\\b",
+            "\\banno\\s+corso\\s*:?\\s*([1-6])\\b",
+            "\\b([1-6])\\s+anno\\s+di\\s+corso\\b",
+            "\\banno\\s*:?\\s*([1-6])\\b",
+            "\\b([1-6])\\s*(?:°|o)?\\s+anno\\b"
+        )
+        return patterns.firstNotNullOfOrNull { pattern ->
+            pattern.toRegex()
+                .find(normalized)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+                ?.takeIf { it in 1..6 }
+        }
+    }
+
+    private fun Document.resolveTeachingRowStudyYears(): Map<Element, Int> {
+        val rowYears = linkedMapOf<Element, Int>()
+        var currentStudyYear: Int? = null
+
+        select(TEACHING_YEAR_SCAN_SELECTOR).forEach { element ->
+            if (element.tagName().equals("tr", ignoreCase = true)) {
+                val rowStudyYear = parseStudyYearFromText(element.text())
+                    ?: currentStudyYear
+                    ?: element.findNearbyStudyYear()
+                if (rowStudyYear != null) {
+                    rowYears[element] = rowStudyYear
+                }
+                return@forEach
+            }
+
+            parseStudyYearFromText(element.text())?.let { year ->
+                currentStudyYear = year
+            }
+        }
+
+        return rowYears
+    }
+
+    private fun Element.findNearbyStudyYear(): Int? {
+        val directText = select("td, th, caption").firstNotNullOfOrNull { cell ->
+            parseStudyYearFromText(cell.text())
+        }
+        if (directText != null) return directText
+
+        closest("table")?.let { table ->
+            table.select("caption, thead").firstNotNullOfOrNull { element ->
+                parseStudyYearFromText(element.text())
+            }?.let { return it }
+
+            table.previousElementSiblings()
+                .take(8)
+                .firstNotNullOfOrNull { sibling ->
+                    parseStudyYearFromText(sibling.text())
+                }
+                ?.let { return it }
+        }
+
+        parents()
+            .take(5)
+            .forEach { parent ->
+                parent.select("> h1, > h2, > h3, > h4, > h5, > h6, > .title, > .anno, > .year")
+                    .firstNotNullOfOrNull { element -> parseStudyYearFromText(element.text()) }
+                    ?.let { return it }
+            }
+
+        return null
     }
 
     private fun Element.findLabeledValue(label: String): String? {
@@ -647,6 +745,10 @@ class UniboPublicParser {
         private const val DEGREE_LINK_SELECTOR = ".card-actions a[href]"
         private const val TEACHING_PLAN_LINK_SELECTOR = "a[href*=insegnamenti/piano/]"
         private const val TEACHING_ROW_SELECTOR = "div.manifestum table tbody tr"
+        private const val TEACHING_YEAR_SCAN_SELECTOR =
+            "div.manifestum h1, div.manifestum h2, div.manifestum h3, div.manifestum h4, " +
+                "div.manifestum h5, div.manifestum h6, div.manifestum .title, " +
+                "div.manifestum .anno, div.manifestum .year, div.manifestum table tbody tr"
         private const val CODE_CELL_SELECTOR = "td.code"
         private const val TITLE_CELL_SELECTOR = "td.title"
         private const val INFO_CELL_SELECTOR = "td.info"
@@ -687,6 +789,22 @@ class UniboPublicParser {
             "ottobre" to 10,
             "novembre" to 11,
             "dicembre" to 12
+        )
+        private val WORD_STUDY_YEARS = linkedMapOf(
+            "primo" to 1,
+            "secondo" to 2,
+            "terzo" to 3,
+            "quarto" to 4,
+            "quinto" to 5,
+            "sesto" to 6
+        )
+        private val ROMAN_STUDY_YEARS = linkedMapOf(
+            "vi" to 6,
+            "iv" to 4,
+            "v" to 5,
+            "iii" to 3,
+            "ii" to 2,
+            "i" to 1
         )
     }
 }

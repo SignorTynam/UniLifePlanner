@@ -30,6 +30,7 @@ import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.domain.model.CourseStatus
 import com.example.unilifeplanner.ui.components.InfoPill
 import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
+import com.example.unilifeplanner.university.publicimport.formatStudyYearLabel
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CourseCard(
@@ -94,6 +95,9 @@ fun CourseCard(
                 StatusPill(status = course.status)
                 if (course.sourceProvider == "UNIBO_PUBLIC") {
                     InfoPill(text = "UniBo")
+                }
+                course.studyYear?.let { studyYear ->
+                    InfoPill(text = formatStudyYearLabel(studyYear))
                 }
                 InfoPill(text = "${course.credits} CFU")
             }

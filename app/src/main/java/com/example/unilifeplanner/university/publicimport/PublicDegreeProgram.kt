@@ -6,5 +6,6 @@ data class PublicDegreeProgram(
     val campus: String?,
     val degreeType: String?,
     val academicYear: String,
-    val officialUrl: String
+    val officialUrl: String,
+    val durationYears: Int? = null
 )

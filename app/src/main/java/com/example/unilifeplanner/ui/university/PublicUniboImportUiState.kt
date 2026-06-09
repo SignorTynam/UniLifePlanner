@@ -5,6 +5,7 @@ import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
 import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
 import com.example.unilifeplanner.university.publicimport.PublicImportStatus
+import com.example.unilifeplanner.university.publicimport.StudyYearOption
 
 data class PublicUniboImportUiState(
     val academicYears: List<String> = listOf("2025/2026", "2024/2025", "2023/2024"),
@@ -23,6 +24,8 @@ data class PublicUniboImportUiState(
     val selectedDegreeProgram: PublicDegreeProgram? = null,
     val curricula: List<PublicCurriculum> = emptyList(),
     val selectedCurriculum: PublicCurriculum? = null,
+    val availableStudyYears: List<StudyYearOption> = emptyList(),
+    val selectedStudyYear: Int? = null,
     val preview: PublicImportPreview? = null,
     val importResult: PublicImportResult? = null,
     val errorMessage: String? = null

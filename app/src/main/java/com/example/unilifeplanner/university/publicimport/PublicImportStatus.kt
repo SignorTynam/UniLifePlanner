@@ -6,6 +6,7 @@ enum class PublicImportStatus {
     DegreeProgramsLoaded,
     LoadingCurricula,
     CurriculumSelection,
+    StudyYearSelection,
     LoadingPreview,
     Preview,
     Importing,

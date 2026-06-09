@@ -11,5 +11,6 @@ data class PublicTeaching(
     val credits: Int?,
     val academicYear: String,
     val officialUrl: String?,
+    val studyYear: Int? = null,
     val sourceProvider: String = UniboPublicConfig.PROVIDER
 )

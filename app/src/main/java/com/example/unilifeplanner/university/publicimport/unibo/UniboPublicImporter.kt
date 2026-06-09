@@ -31,6 +31,14 @@ class UniboPublicImporter(
         val localCourseIds = mutableMapOf<String, Int>()
 
         preview.teachings.forEach { teaching ->
+            if (preview.selectedStudyYear != null &&
+                teaching.studyYear != null &&
+                teaching.studyYear != preview.selectedStudyYear
+            ) {
+                warnings += "${teaching.name}: insegnamento saltato perche non appartiene all'anno selezionato."
+                return@forEach
+            }
+
             val lessonsForTeaching = preview.lessonsByTeachingExternalId[teaching.externalId].orEmpty()
             val mappedCourse = mapper.mapTeachingToCourse(
                 teaching = teaching,

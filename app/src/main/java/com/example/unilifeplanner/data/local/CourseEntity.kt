@@ -29,6 +29,7 @@ data class CourseEntity(
     val externalId: String? = null,
     val sourceProvider: String? = null,
     val officialUrl: String? = null,
+    val studyYear: Int? = null,
     val createdAt: Long,
     val updatedAt: Long
 )

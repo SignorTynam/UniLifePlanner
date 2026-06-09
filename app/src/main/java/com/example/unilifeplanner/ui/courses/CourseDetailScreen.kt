@@ -55,6 +55,7 @@ import com.example.unilifeplanner.ui.components.UniLifeTopBar
 import com.example.unilifeplanner.ui.courses.components.formatCourseStatus
 import com.example.unilifeplanner.ui.utils.ExternalIntentResult
 import com.example.unilifeplanner.ui.utils.ExternalIntentUtils
+import com.example.unilifeplanner.university.publicimport.formatStudyYearLabel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -350,6 +351,9 @@ private fun CourseInfoCard(course: CourseEntity) {
             )
             DetailRow(label = "Docente", value = course.professor)
             DetailRow(label = "CFU", value = course.credits.toString())
+            course.studyYear?.let { studyYear ->
+                DetailRow(label = "Anno di corso", value = formatStudyYearLabel(studyYear))
+            }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically

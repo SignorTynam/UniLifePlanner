@@ -72,12 +72,14 @@ class UniboPublicImportRepository(
     override suspend fun loadPreview(
         degreeProgram: PublicDegreeProgram,
         curriculum: PublicCurriculum?,
+        selectedStudyYear: Int?,
         forceRefresh: Boolean
     ): PublicImportPreview {
         val cacheKey = listOf(
             degreeProgram.externalId,
             degreeProgram.academicYear,
-            curriculum?.externalId.orEmpty()
+            curriculum?.externalId.orEmpty(),
+            selectedStudyYear?.toString().orEmpty()
         ).joinToString("|")
         if (!forceRefresh) {
             cache.getPreview(cacheKey)?.let { return it }
@@ -92,6 +94,7 @@ class UniboPublicImportRepository(
                 teachings = emptyList(),
                 lessons = emptyList(),
                 examAppeals = emptyList(),
+                selectedStudyYear = selectedStudyYear,
                 warnings = listOf("Pagina pubblica del corso di laurea non trovata."),
                 curriculum = curriculum
             )
@@ -118,15 +121,42 @@ class UniboPublicImportRepository(
             warnings += "Nessun piano didattico pubblico trovato per ${degreeProgram.academicYear}."
         }
 
-        val planTeachings = planLinks
-            .flatMap { planUrl ->
-                val planHtml = client.getDegreeProgramPage(planUrl)
-                parser.parseTeachingsFromDegreeProgramPage(planHtml, baseDegreeProgram)
+        val planHtmlPages = planLinks.map { planUrl -> client.getDegreeProgramPage(planUrl) }
+        val allPlanTeachings = planHtmlPages
+            .flatMap { planHtml ->
+                parser.parseTeachingsFromDegreeProgramPage(
+                    html = planHtml,
+                    degreeProgram = baseDegreeProgram
+                )
             }
             .distinctBy { it.externalId }
+        val cannotDistinguishStudyYear = selectedStudyYear != null &&
+            allPlanTeachings.isNotEmpty() &&
+            allPlanTeachings.none { it.studyYear != null }
+        val planTeachings = when {
+            cannotDistinguishStudyYear -> emptyList()
+            selectedStudyYear == null -> allPlanTeachings
+            else -> planHtmlPages
+                .flatMap { planHtml ->
+                    parser.parseTeachingsFromDegreeProgramPage(
+                        html = planHtml,
+                        degreeProgram = baseDegreeProgram,
+                        selectedStudyYear = selectedStudyYear
+                    )
+                }
+                .distinctBy { it.externalId }
+        }
+
+        if (cannotDistinguishStudyYear) {
+            warnings += "Non e stato possibile distinguere gli insegnamenti per anno di corso nella pagina pubblica UniBo."
+        }
 
         if (planTeachings.isEmpty()) {
-            warnings += "Nessun insegnamento pubblico trovato per il corso selezionato."
+            warnings += if (selectedStudyYear != null) {
+                "Nessun insegnamento pubblico trovato per il ${selectedStudyYear}° anno."
+            } else {
+                "Nessun insegnamento pubblico trovato per il corso selezionato."
+            }
         }
 
         val enrichedTeachings = mutableListOf<PublicTeaching>()
@@ -169,6 +199,7 @@ class UniboPublicImportRepository(
             teachings = enrichedTeachings,
             lessons = lessons.distinctBy { it.externalId },
             examAppeals = examAppeals.distinctBy { it.externalId },
+            selectedStudyYear = selectedStudyYear,
             warnings = warnings.distinct(),
             curriculum = curriculum
         )

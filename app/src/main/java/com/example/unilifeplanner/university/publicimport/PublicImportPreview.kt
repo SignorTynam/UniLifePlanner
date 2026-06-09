@@ -5,6 +5,7 @@ data class PublicImportPreview(
     val teachings: List<PublicTeaching>,
     val lessons: List<PublicLesson>,
     val examAppeals: List<PublicExamAppeal> = emptyList(),
+    val selectedStudyYear: Int? = null,
     val warnings: List<String> = emptyList(),
     val curriculum: PublicCurriculum? = null
 ) {

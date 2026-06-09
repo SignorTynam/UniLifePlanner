@@ -14,6 +14,7 @@ interface PublicUniversityProvider {
     suspend fun loadPreview(
         degreeProgram: PublicDegreeProgram,
         curriculum: PublicCurriculum? = null,
+        selectedStudyYear: Int? = null,
         forceRefresh: Boolean = false
     ): PublicImportPreview
 

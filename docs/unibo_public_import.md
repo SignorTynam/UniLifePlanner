@@ -2,7 +2,7 @@
 
 ## Scopo
 
-La funzione "Importa da UniBo" consente di cercare un corso di laurea dell'Universita di Bologna e importare nel planner gli insegnamenti pubblici del piano didattico. Quando gli orari sono pubblici e riconoscibili, importa anche le lezioni ricorrenti con aula e edificio. Importa inoltre gli appelli d'esame pubblici visibili nella pagina pubblica del corso di laurea.
+La funzione "Importa da UniBo" consente di cercare un corso di laurea dell'Universita di Bologna e importare nel planner gli insegnamenti pubblici del piano didattico per l'anno di corso scelto dall'utente. Quando gli orari sono pubblici e riconoscibili, importa anche le lezioni ricorrenti con aula e edificio. Importa inoltre gli appelli d'esame pubblici visibili nella pagina pubblica del corso di laurea.
 
 Questa funzione usa solo dati pubblici accessibili senza autenticazione. Non importa dati personali dello studente come libretto, prenotazioni esami o piano personale individuale.
 
@@ -13,6 +13,7 @@ L'import pubblico non richiede login UniBo, username, password, token o OAuth. N
 ## Dati importati
 
 - Insegnamenti del corso di laurea selezionato.
+- Anno di corso dell'insegnamento, quando riconosciuto dalla pagina pubblica.
 - CFU, se presenti nel piano didattico pubblico.
 - Docenti, se presenti nella ricerca pubblica degli insegnamenti.
 - Link ufficiale UniBo dell'insegnamento, se disponibile.
@@ -20,6 +21,14 @@ L'import pubblico non richiede login UniBo, username, password, token o OAuth. N
 - Appelli d'esame pubblici del corso di laurea selezionato.
 - Data, ora, tipo prova e luogo dell'appello, quando presenti pubblicamente.
 - Note e lista iscrizioni, solo se esposte nella pagina pubblica.
+
+## Anno di corso
+
+Durante l'import UniBo l'utente sceglie esplicitamente l'anno di corso. Per una laurea triennale vengono proposti 1°, 2° e 3° anno. Per una laurea magistrale vengono proposti 1° e 2° anno. Per una laurea magistrale a ciclo unico vengono proposti gli anni in base alla durata pubblicata da UniBo, fino a 5 o 6 anni quando indicato.
+
+La preview e l'import includono solo insegnamenti, lezioni/laboratori e appelli collegati all'anno scelto. Il refresh manuale e automatico usa lo stesso anno salvato dopo l'ultimo import riuscito.
+
+Se una vecchia importazione non contiene l'anno scelto, il refresh non importa tutto il piano didattico: l'utente deve rifare l'import da "Universita" scegliendo l'anno di corso.
 
 ## Limiti
 
@@ -34,9 +43,9 @@ I record importati usano `sourceProvider = "UNIBO_PUBLIC"` per insegnamenti e le
 
 ## Aggiornamento dati UniBo
 
-Dopo un import riuscito, l'app salva la scelta pubblica UniBo dell'utente: corso di laurea, anno accademico, sito pubblico e curriculum se selezionato.
+Dopo un import riuscito, l'app salva la scelta pubblica UniBo dell'utente: corso di laurea, anno accademico, sito pubblico, curriculum se selezionato e anno di corso scelto.
 
-Il refresh aggiorna corsi, lezioni/laboratori e appelli d'esame pubblici in un unico flusso. E disponibile dalle schermate "Corsi", "Lezioni" ed "Esami" e viene eseguito anche automaticamente all'apertura dell'app se esiste una importazione UniBo precedente.
+Il refresh aggiorna corsi, lezioni/laboratori e appelli d'esame pubblici in un unico flusso, limitandosi all'anno di corso salvato. E disponibile dalle schermate "Corsi", "Lezioni" ed "Esami" e viene eseguito anche automaticamente all'apertura dell'app se esiste una importazione UniBo precedente.
 
 Il refresh non richiede login, non usa AlmaEsami e legge solo pagine pubbliche UniBo. I dati manuali non vengono cancellati. Le lezioni e gli appelli UniBo non piu presenti nel preview aggiornato possono essere rimossi, con cancellazione dei relativi promemoria schedulati.
 
@@ -70,22 +79,24 @@ I selettori CSS sono centralizzati in `UniboPublicParser`. Le URL pubbliche sono
 5. Selezionare anno accademico `2025/2026`, campus `Tutti` o `Cesena`, tipologia `Laurea`.
 6. Cercare `Ingegneria e Scienze Informatiche`.
 7. Selezionare il risultato corretto.
-8. Verificare anteprima insegnamenti, CFU, docenti, lezioni, appelli d'esame e avvisi.
-9. Importare nel planner.
-10. Aprire "Corsi" e verificare che gli insegnamenti siano presenti.
-11. Aprire un insegnamento e verificare note/link ufficiale.
-12. Se lezioni disponibili, aprire "Lezioni" e verificare orari e aule.
-13. Aprire "Esami" e verificare che gli appelli pubblici importati siano presenti.
-14. Ripetere l'import e verificare che non crei duplicati.
-15. Verificare che il pulsante "Importa UniBo" non sia piu presente nella schermata "Esami".
-16. Verificare che l'import avvenga solo da "Universita".
-17. Premere Refresh da "Corsi", "Lezioni" ed "Esami" e verificare che venga aggiornato l'intero set UniBo.
-18. Completare un corso e verificare che lezioni e appelli collegati non compaiano nelle sezioni principali.
-19. Attivare un promemoria appello futuro e verificare la schedulazione del feedback post-esame.
-20. Registrare un esito superato e verificare l'opzione di completamento corso.
-21. Disattivare internet e verificare un errore pulito.
-22. Verificare tema chiaro/scuro.
-23. Verificare `versionName = "1.1.6"`.
+8. Selezionare l'anno di corso, ad esempio "2° anno".
+9. Verificare che l'anteprima mostri solo insegnamenti dell'anno scelto, con CFU, docenti, lezioni, appelli d'esame e avvisi.
+10. Importare nel planner.
+11. Aprire "Corsi" e verificare che gli insegnamenti siano presenti e mostrino la pill "1° anno", "2° anno" o equivalente quando disponibile.
+12. Aprire un insegnamento e verificare note/link ufficiale.
+13. Se lezioni disponibili, aprire "Lezioni" e verificare orari e aule solo dei corsi dell'anno scelto.
+14. Aprire "Esami" e verificare che gli appelli pubblici importati siano presenti solo per i corsi dell'anno scelto.
+15. Ripetere l'import e verificare che non crei duplicati.
+16. Verificare che il pulsante "Importa UniBo" non sia piu presente nella schermata "Esami".
+17. Verificare che l'import avvenga solo da "Universita".
+18. Premere Refresh da "Corsi", "Lezioni" ed "Esami" e verificare che venga aggiornato solo l'anno di corso scelto.
+19. Con una vecchia importazione senza anno scelto, verificare che il refresh chieda di rifare l'import da "Universita".
+20. Completare un corso e verificare che lezioni e appelli collegati non compaiano nelle sezioni principali.
+21. Attivare un promemoria appello futuro e verificare la schedulazione del feedback post-esame.
+22. Registrare un esito superato e verificare l'opzione di completamento corso.
+23. Disattivare internet e verificare un errore pulito.
+24. Verificare tema chiaro/scuro.
+25. Verificare `versionName = "1.1.7"`.
 
 ## TODO futuri
 

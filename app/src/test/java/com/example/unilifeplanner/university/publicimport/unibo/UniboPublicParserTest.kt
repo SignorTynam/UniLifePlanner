@@ -23,6 +23,7 @@ class UniboPublicParserTest {
         assertEquals("Ingegneria e scienze informatiche", results.first().name)
         assertEquals("Cesena", results.first().campus)
         assertEquals("Laurea", results.first().degreeType)
+        assertEquals(3, results.first().durationYears)
     }
 
     @Test
@@ -98,6 +99,70 @@ class UniboPublicParserTest {
 
         assertTrue(results.isEmpty())
         assertTrue(teachings.isEmpty())
+    }
+
+    @Test
+    fun parseDurationYears_readsItalianDurationText() {
+        assertEquals(3, parser.parseDurationYears("3 anni"))
+        assertEquals(2, parser.parseDurationYears("Durata 2 anni"))
+        assertEquals(5, parser.parseDurationYears("5 anni"))
+        assertEquals(6, parser.parseDurationYears("6 anni"))
+    }
+
+    @Test
+    fun parseStudyYearFromText_readsItalianStudyYearText() {
+        assertEquals(1, parser.parseStudyYearFromText("Primo Anno"))
+        assertEquals(2, parser.parseStudyYearFromText("Secondo Anno"))
+        assertEquals(3, parser.parseStudyYearFromText("Terzo Anno"))
+        assertEquals(1, parser.parseStudyYearFromText("1° Anno"))
+        assertEquals(2, parser.parseStudyYearFromText("II anno"))
+        assertEquals(6, parser.parseStudyYearFromText("VI anno"))
+    }
+
+    @Test
+    fun parseTeachingsFromDegreeProgramPage_filtersBySelectedStudyYear() {
+        val teachings = parser.parseTeachingsFromDegreeProgramPage(
+            html = """
+                <!doctype html>
+                <html>
+                <body>
+                <div class="manifestum">
+                    <h2>Primo Anno</h2>
+                    <table><tbody>
+                        <tr>
+                            <td class="code">10001</td>
+                            <td class="title">PROGRAMMAZIONE</td>
+                            <td class="info">12 CFU</td>
+                        </tr>
+                    </tbody></table>
+                    <h2>Secondo Anno</h2>
+                    <table><tbody>
+                        <tr>
+                            <td class="code">20002</td>
+                            <td class="title">ALGORITMI</td>
+                            <td class="info">6 CFU</td>
+                        </tr>
+                    </tbody></table>
+                    <h2>Terzo Anno</h2>
+                    <table><tbody>
+                        <tr>
+                            <td class="code">30003</td>
+                            <td class="title">SISTEMI OPERATIVI</td>
+                            <td class="info">6 CFU</td>
+                        </tr>
+                    </tbody></table>
+                </div>
+                </body>
+                </html>
+            """.trimIndent(),
+            degreeProgram = degreeProgram(),
+            selectedStudyYear = 2
+        )
+
+        assertEquals(1, teachings.size)
+        assertEquals("20002", teachings.first().code)
+        assertEquals("ALGORITMI", teachings.first().name)
+        assertEquals(2, teachings.first().studyYear)
     }
 
     @Test
