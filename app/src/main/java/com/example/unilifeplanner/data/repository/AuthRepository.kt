@@ -50,7 +50,11 @@ class AuthRepository(
             is FirebaseAuthInvalidUserException -> "Utente non trovato."
             is FirebaseAuthInvalidCredentialsException -> "Email o password non valide."
             is FirebaseNetworkException -> "Rete non disponibile. Controlla la connessione."
-            else -> message ?: "Errore di autenticazione. Riprova."
+            else -> if (message?.contains("API key not valid", ignoreCase = true) == true) {
+                "Configurazione Firebase non valida. Controlla il file google-services.json e le restrizioni della API key."
+            } else {
+                message ?: "Errore di autenticazione. Riprova."
+            }
         }
     }
 }
