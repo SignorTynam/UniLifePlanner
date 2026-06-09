@@ -53,7 +53,21 @@ import com.example.unilifeplanner.data.local.CourseEntity
 import com.example.unilifeplanner.ui.components.UniLifeErrorState
 import com.example.unilifeplanner.ui.components.UniLifeLoadingState
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
-import com.example.unilifeplanner.ui.courses.components.CourseCard
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.unilifeplanner.domain.model.CourseStatus
+import com.example.unilifeplanner.ui.courses.components.ModernCourseItem
 
 @Composable
 fun CoursesScreen(
@@ -149,10 +163,14 @@ private fun CoursesScreenContent(
 
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(20.dp),
+                        contentPadding = PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        item {
+                            CoursesOverviewHeader(uiState = uiState)
+                        }
+
                         item {
                             CoursesFilters(
                                 uiState = uiState,
@@ -162,6 +180,22 @@ private fun CoursesScreenContent(
                                 onSortOptionChange = onSortOptionChange,
                                 onClearFilters = onClearFilters
                             )
+                        }
+
+                        if (uiState.filteredCourses.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = if (hasActiveFilters(uiState)) {
+                                        "Risultati della ricerca (${uiState.filteredCourses.size})"
+                                    } else {
+                                        "Tutti i corsi (${uiState.filteredCourses.size})"
+                                    },
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                                )
+                            }
                         }
 
                         if (uiState.filteredCourses.isEmpty()) {
@@ -177,7 +211,7 @@ private fun CoursesScreenContent(
                                 items = uiState.filteredCourses,
                                 key = { course -> course.id }
                             ) { course ->
-                                CourseCard(
+                                ModernCourseItem(
                                     course = course,
                                     onClick = { onCourseClick(course.id) },
                                     onFavoriteClick = { onFavoriteClick(course) }
@@ -201,11 +235,11 @@ private fun CoursesFilters(
     onClearFilters: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
+        // Modern Pill Search Bar
+        androidx.compose.material3.TextField(
             value = uiState.searchQuery,
             onValueChange = onSearchQueryChange,
-            label = { Text(text = "Cerca") },
-            placeholder = { Text(text = "Nome o docente") },
+            placeholder = { Text(text = "Cerca corso o docente") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Filled.Search,
@@ -213,7 +247,7 @@ private fun CoursesFilters(
                 )
             },
             trailingIcon = {
-                if (uiState.searchQuery.isNotBlank()) {
+                if (uiState.searchQuery.isNotEmpty()) {
                     IconButton(onClick = { onSearchQueryChange("") }) {
                         Icon(
                             imageVector = Icons.Filled.Close,
@@ -223,38 +257,78 @@ private fun CoursesFilters(
                 }
             },
             singleLine = true,
+            shape = CircleShape,
+            colors = androidx.compose.material3.TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
             modifier = Modifier.fillMaxWidth()
         )
 
+        // Row 1: Status Chips with counts
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.horizontalScroll(rememberScrollState())
         ) {
             CourseStatusFilter.entries.forEach { filter ->
+                val count = when (filter) {
+                    CourseStatusFilter.ALL -> uiState.courses.size
+                    CourseStatusFilter.TO_STUDY -> countCoursesByStatus(uiState.courses, CourseStatus.TO_STUDY)
+                    CourseStatusFilter.IN_PROGRESS -> countCoursesByStatus(uiState.courses, CourseStatus.IN_PROGRESS)
+                    CourseStatusFilter.COMPLETED -> countCoursesByStatus(uiState.courses, CourseStatus.COMPLETED)
+                }
+                
                 FilterChip(
                     selected = uiState.selectedStatusFilter == filter,
                     onClick = { onStatusFilterChange(filter) },
-                    label = { Text(text = filterLabel(filter)) }
+                    label = { Text(text = "${filterLabel(filter)} ($count)") }
                 )
             }
         }
 
+        // Row 2: Favorites, Sorting, Clear button
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
         ) {
             FilterChip(
                 selected = uiState.showFavoritesOnly,
                 onClick = { onFavoritesOnlyChange(!uiState.showFavoritesOnly) },
-                label = { Text(text = "Solo preferiti") }
+                label = { Text(text = "Solo preferiti") },
+                leadingIcon = {
+                    if (uiState.showFavoritesOnly) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             )
+            
             SortDropdown(
                 selectedOption = uiState.selectedSortOption,
                 onSortOptionChange = onSortOptionChange
             )
-            OutlinedButton(onClick = onClearFilters) {
-                Text(text = "Cancella filtri")
+            
+            if (hasActiveFilters(uiState)) {
+                OutlinedButton(
+                    onClick = onClearFilters,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(
+                        text = "Cancella",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             }
         }
     }
@@ -268,14 +342,18 @@ private fun SortDropdown(
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        OutlinedButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Sort,
-                contentDescription = null
-            )
-            Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-            Text(text = sortLabel(selectedOption))
-        }
+        FilterChip(
+            selected = selectedOption != CourseSortOption.DEFAULT,
+            onClick = { expanded = true },
+            label = { Text(text = sortLabel(selectedOption)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        )
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
@@ -302,44 +380,67 @@ fun EmptyCoursesState(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp, horizontal = 20.dp),
+            .padding(vertical = 48.dp, horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Filled.School,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth(0.18f)
-        )
-        Spacer(modifier = Modifier.height(20.dp))
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.School,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(40.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = if (hasCourses) {
-                "Nessun corso trovato con i filtri selezionati."
+                "Nessun risultato trovato"
             } else {
-                "Nessun corso aggiunto"
+                "Inizia il tuo percorso"
             },
             style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = if (hasCourses) {
-                "Modifica ricerca, stato, preferiti o ordinamento."
+                "Modifica i filtri o la ricerca per trovare il corso che cerchi."
             } else {
-                "Premi + per creare il tuo primo corso."
+                "Aggiungi i tuoi corsi per visualizzare il piano di studi ed iniziare a pianificare esami e lezioni."
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(0.85f)
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         if (hasCourses) {
-            OutlinedButton(onClick = onClearFilters) {
-                Text(text = "Cancella filtri")
+            Button(
+                onClick = onClearFilters,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(text = "Mostra tutti i corsi")
             }
         } else {
-            Button(onClick = onAddCourseClick) {
+            Button(
+                onClick = onAddCourseClick,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(text = "Aggiungi corso")
             }
         }
@@ -370,6 +471,195 @@ fun CoursesLoadingState() {
         contentAlignment = Alignment.Center
     ) {
         UniLifeLoadingState(message = "Caricamento corsi...")
+    }
+}
+
+@Composable
+private fun CoursesOverviewHeader(
+    uiState: CourseUiState,
+    modifier: Modifier = Modifier
+) {
+    val totalC = uiState.courses.size
+    val totalCfu = totalCredits(uiState.courses)
+    val completedC = countCoursesByStatus(uiState.courses, CourseStatus.COMPLETED)
+    val inProgressC = countCoursesByStatus(uiState.courses, CourseStatus.IN_PROGRESS)
+    val toStudyC = countCoursesByStatus(uiState.courses, CourseStatus.TO_STUDY)
+    val isFiltered = hasActiveFilters(uiState)
+    val filteredC = uiState.filteredCourses.size
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Il tuo piano di studi",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "$totalC corsi • $totalCfu CFU totali",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                if (isFiltered) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                    ) {
+                        Text(
+                            text = "$filteredC filtrati",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MiniMetricItem(
+                    label = "Da studiare",
+                    count = toStudyC,
+                    color = statusAccentColor(CourseStatus.TO_STUDY.name),
+                    containerColor = statusContainerColor(CourseStatus.TO_STUDY.name),
+                    contentColor = statusContentColor(CourseStatus.TO_STUDY.name),
+                    modifier = Modifier.weight(1f)
+                )
+                MiniMetricItem(
+                    label = "In corso",
+                    count = inProgressC,
+                    color = statusAccentColor(CourseStatus.IN_PROGRESS.name),
+                    containerColor = statusContainerColor(CourseStatus.IN_PROGRESS.name),
+                    contentColor = statusContentColor(CourseStatus.IN_PROGRESS.name),
+                    modifier = Modifier.weight(1f)
+                )
+                MiniMetricItem(
+                    label = "Completati",
+                    count = completedC,
+                    color = statusAccentColor(CourseStatus.COMPLETED.name),
+                    containerColor = statusContainerColor(CourseStatus.COMPLETED.name),
+                    contentColor = statusContentColor(CourseStatus.COMPLETED.name),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniMetricItem(
+    label: String,
+    count: Int,
+    color: Color,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor.copy(alpha = 0.4f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.15f))
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+// UI Helper functions
+private fun hasActiveFilters(uiState: CourseUiState): Boolean {
+    return uiState.searchQuery.isNotEmpty() ||
+        uiState.selectedStatusFilter != CourseStatusFilter.ALL ||
+        uiState.showFavoritesOnly ||
+        uiState.selectedSortOption != CourseSortOption.DEFAULT
+}
+
+private fun countCoursesByStatus(courses: List<CourseEntity>, status: CourseStatus): Int {
+    return courses.count { it.status == status.name }
+}
+
+private fun totalCredits(courses: List<CourseEntity>): Int {
+    return courses.sumOf { it.credits }
+}
+
+private fun courseInitials(name: String): String {
+    val words = name.trim().split(Regex("\\s+"))
+    return when {
+        words.isEmpty() -> ""
+        words.size == 1 -> words[0].take(2).uppercase()
+        else -> {
+            val first = words[0].take(1)
+            val second = words[1].take(1)
+            (first + second).uppercase()
+        }
+    }
+}
+
+@Composable
+private fun statusAccentColor(status: String): Color {
+    return when (status) {
+        CourseStatus.COMPLETED.name -> MaterialTheme.colorScheme.primary
+        CourseStatus.IN_PROGRESS.name -> MaterialTheme.colorScheme.secondary
+        CourseStatus.TO_STUDY.name -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.outline
+    }
+}
+
+@Composable
+private fun statusContainerColor(status: String): Color {
+    return when (status) {
+        CourseStatus.COMPLETED.name -> MaterialTheme.colorScheme.primaryContainer
+        CourseStatus.IN_PROGRESS.name -> MaterialTheme.colorScheme.secondaryContainer
+        CourseStatus.TO_STUDY.name -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+}
+
+@Composable
+private fun statusContentColor(status: String): Color {
+    return when (status) {
+        CourseStatus.COMPLETED.name -> MaterialTheme.colorScheme.onPrimaryContainer
+        CourseStatus.IN_PROGRESS.name -> MaterialTheme.colorScheme.onSecondaryContainer
+        CourseStatus.TO_STUDY.name -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }
 
