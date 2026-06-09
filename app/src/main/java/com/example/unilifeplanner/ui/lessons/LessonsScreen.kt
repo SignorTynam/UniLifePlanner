@@ -3,17 +3,19 @@ package com.example.unilifeplanner.ui.lessons
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
@@ -26,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,8 +47,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.notifications.NotificationHelper
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
-import com.example.unilifeplanner.ui.lessons.components.LessonCard
+import com.example.unilifeplanner.ui.lessons.components.LessonDaySection
+import com.example.unilifeplanner.ui.lessons.components.LessonEmptyState
 import com.example.unilifeplanner.ui.lessons.components.LessonFiltersSection
+import com.example.unilifeplanner.ui.lessons.components.LessonTimelineItem
+import com.example.unilifeplanner.ui.lessons.components.LessonsAgendaHeader
+import com.example.unilifeplanner.ui.lessons.components.hasActiveLessonFilters
 import com.example.unilifeplanner.ui.utils.ExternalIntentResult
 import com.example.unilifeplanner.ui.utils.ExternalIntentUtils
 import kotlinx.coroutines.launch
@@ -81,6 +88,19 @@ fun LessonsScreen(
         }
     )
 
+    val handleAddLesson = {
+        handleAddLessonClick(
+            uiState = uiState,
+            onAddLessonClick = onAddLessonClick,
+            onShowCoursePicker = { showCoursePicker = true },
+            onNoCoursesAvailable = {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Nessun corso disponibile")
+                }
+            }
+        )
+    }
+
     LaunchedEffect(initialCourseId) {
         viewModel.setInitialCourseFilter(initialCourseId)
     }
@@ -110,7 +130,10 @@ fun LessonsScreen(
                         enabled = !uiState.isRefreshing
                     ) {
                         if (uiState.isRefreshing) {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
                         } else {
                             Icon(
                                 imageVector = Icons.Filled.Refresh,
@@ -122,20 +145,7 @@ fun LessonsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    val selectedCourseId = uiState.selectedCourseId
-                    if (selectedCourseId != null) {
-                        onAddLessonClick(selectedCourseId)
-                    } else if (uiState.availableCourses.isEmpty()) {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Nessun corso disponibile")
-                        }
-                    } else {
-                        showCoursePicker = true
-                    }
-                }
-            ) {
+            FloatingActionButton(onClick = handleAddLesson) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = "Aggiungi lezione"
@@ -157,8 +167,10 @@ fun LessonsScreen(
                     onDateFilterChange = viewModel::onDateFilterChange,
                     onCourseFilterChange = viewModel::onCourseFilterChange,
                     onSortOptionChange = viewModel::onSortOptionChange,
+                    onSelectedDayOfWeekChange = viewModel::onSelectedDayOfWeekChange,
                     onClearFilters = viewModel::clearFilters,
                     onTogglePastThisWeek = viewModel::togglePastThisWeekVisibility,
+                    onAddLessonClick = handleAddLesson,
                     onLessonClick = onLessonClick,
                     onOpenCourseClick = onOpenCourseClick,
                     onToggleReminder = { lesson, enabled ->
@@ -209,18 +221,26 @@ private fun LessonsContent(
     onDateFilterChange: (LessonDateFilter) -> Unit,
     onCourseFilterChange: (Int?) -> Unit,
     onSortOptionChange: (LessonSortOption) -> Unit,
+    onSelectedDayOfWeekChange: (Int?) -> Unit,
     onClearFilters: () -> Unit,
     onTogglePastThisWeek: () -> Unit,
+    onAddLessonClick: () -> Unit,
     onLessonClick: (Int, Int) -> Unit,
     onOpenCourseClick: (Int) -> Unit,
     onToggleReminder: (LessonListItemUi, Boolean) -> Unit,
     onOpenMapsClick: (LessonListItemUi) -> Unit
 ) {
+    val groupedUpcoming = rememberGroupedLessons(uiState.upcomingLessons)
+
     LazyColumn(
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize()
     ) {
+        item {
+            LessonsAgendaHeader(uiState = uiState)
+        }
+
         item {
             LessonFiltersSection(
                 uiState = uiState,
@@ -228,15 +248,18 @@ private fun LessonsContent(
                 onDateFilterChange = onDateFilterChange,
                 onCourseFilterChange = onCourseFilterChange,
                 onSortOptionChange = onSortOptionChange,
+                onSelectedDayOfWeekChange = onSelectedDayOfWeekChange,
                 onClearFilters = onClearFilters
             )
         }
 
         if (!uiState.hasAnyLessons) {
             item {
-                EmptyLessonsState(
-                    title = "Nessuna lezione inserita",
-                    message = "Apri il dettaglio di un corso e aggiungi le lezioni."
+                LessonEmptyState(
+                    title = "Nessuna lezione programmata",
+                    message = "Aggiungi una lezione manualmente o importa i dati da UniBo.",
+                    primaryActionLabel = "Aggiungi lezione",
+                    onPrimaryAction = onAddLessonClick
                 )
             }
             return@LazyColumn
@@ -244,24 +267,37 @@ private fun LessonsContent(
 
         if (uiState.upcomingLessons.isEmpty() && uiState.pastThisWeekLessons.isEmpty()) {
             item {
-                EmptyLessonsState(
-                    title = "Nessuna lezione trovata con i filtri selezionati.",
-                    message = "Modifica ricerca, corso o ordinamento."
+                LessonEmptyState(
+                    title = "Nessuna lezione trovata",
+                    message = "Prova a modificare ricerca, giorno, corso o ordinamento.",
+                    primaryActionLabel = if (hasActiveLessonFilters(uiState)) {
+                        "Cancella filtri"
+                    } else {
+                        null
+                    },
+                    onPrimaryAction = if (hasActiveLessonFilters(uiState)) {
+                        onClearFilters
+                    } else {
+                        null
+                    }
                 )
             }
             return@LazyColumn
         }
 
         items(
-            items = uiState.upcomingLessons,
-            key = { lesson -> lesson.lessonId }
-        ) { lesson ->
-            LessonCard(
-                lesson = lesson,
-                onEditClick = { onLessonClick(lesson.courseId, lesson.lessonId) },
-                onOpenMapsClick = { onOpenMapsClick(lesson) },
-                onOpenCourseClick = { onOpenCourseClick(lesson.courseId) },
-                onToggleReminderClick = { onToggleReminder(lesson, !lesson.reminderEnabled) }
+            items = groupedUpcoming,
+            key = { group -> group.dayTitle }
+        ) { group ->
+            LessonDaySection(
+                dayTitle = group.dayTitle,
+                lessons = group.lessons,
+                onEditClick = { lesson -> onLessonClick(lesson.courseId, lesson.lessonId) },
+                onOpenMapsClick = onOpenMapsClick,
+                onOpenCourseClick = onOpenCourseClick,
+                onToggleReminderClick = { lesson ->
+                    onToggleReminder(lesson, !lesson.reminderEnabled)
+                }
             )
         }
 
@@ -279,7 +315,7 @@ private fun LessonsContent(
                 items = uiState.pastThisWeekLessons,
                 key = { lesson -> "past-${lesson.lessonId}" }
             ) { lesson ->
-                LessonCard(
+                LessonTimelineItem(
                     lesson = lesson,
                     onEditClick = { onLessonClick(lesson.courseId, lesson.lessonId) },
                     onOpenMapsClick = { onOpenMapsClick(lesson) },
@@ -296,18 +332,30 @@ private fun PastLessonsHeader(
     isExpanded: Boolean,
     onToggle: () -> Unit
 ) {
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Lezioni gia svolte questa settimana",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
         )
-        TextButton(onClick = onToggle) {
-            Text(text = if (isExpanded) "Nascondi" else "Mostra")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Lezioni già svolte questa settimana",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            TextButton(onClick = onToggle) {
+                Text(text = if (isExpanded) "Nascondi" else "Mostra")
+            }
         }
     }
 }
@@ -343,37 +391,49 @@ private fun LessonCoursePickerDialog(
 }
 
 @Composable
-private fun EmptyLessonsState(
-    title: String,
-    message: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.padding(vertical = 4.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
 private fun LessonsLoadingState() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
+    }
+}
+
+private data class LessonDayGroup(
+    val dayTitle: String,
+    val lessons: List<LessonListItemUi>
+)
+
+@Composable
+private fun rememberGroupedLessons(lessons: List<LessonListItemUi>): List<LessonDayGroup> {
+    return remember(lessons) {
+        lessons
+            .groupBy { it.relativeDayLabel }
+            .entries
+            .sortedBy { (_, groupLessons) ->
+                groupLessons.minOf { it.nextOccurrenceMillis }
+            }
+            .map { (dayTitle, groupLessons) ->
+                LessonDayGroup(
+                    dayTitle = dayTitle,
+                    lessons = groupLessons
+                )
+            }
+    }
+}
+
+private fun handleAddLessonClick(
+    uiState: LessonsUiState,
+    onAddLessonClick: (Int) -> Unit,
+    onShowCoursePicker: () -> Unit,
+    onNoCoursesAvailable: () -> Unit
+) {
+    val selectedCourseId = uiState.selectedCourseId
+    when {
+        selectedCourseId != null -> onAddLessonClick(selectedCourseId)
+        uiState.availableCourses.isEmpty() -> onNoCoursesAvailable()
+        else -> onShowCoursePicker()
     }
 }
 

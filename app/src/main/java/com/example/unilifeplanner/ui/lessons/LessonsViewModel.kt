@@ -38,6 +38,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
     private val _selectedCourseId = MutableStateFlow<Int?>(null)
     private val _selectedDateFilter = MutableStateFlow(LessonDateFilter.ALL)
     private val _selectedSortOption = MutableStateFlow(LessonSortOption.NEXT_UPCOMING)
+    private val _selectedDayOfWeek = MutableStateFlow<Int?>(null)
     private val _showPastThisWeek = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
     private val _isLoading = MutableStateFlow(true)
@@ -50,17 +51,29 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val filterStateFlow = combine(
-        _searchQuery,
-        _selectedCourseId,
-        _selectedDateFilter,
-        _selectedSortOption,
-        _showPastThisWeek
-    ) { searchQuery, selectedCourseId, dateFilter, sortOption, showPast ->
+        combine(
+            _searchQuery,
+            _selectedCourseId,
+            _selectedDateFilter
+        ) { searchQuery, selectedCourseId, dateFilter ->
+            Triple(searchQuery, selectedCourseId, dateFilter)
+        },
+        combine(
+            _selectedSortOption,
+            _selectedDayOfWeek,
+            _showPastThisWeek
+        ) { sortOption, selectedDayOfWeek, showPast ->
+            Triple(sortOption, selectedDayOfWeek, showPast)
+        }
+    ) { searchAndCourse, sortAndDay ->
+        val (searchQuery, selectedCourseId, dateFilter) = searchAndCourse
+        val (sortOption, selectedDayOfWeek, showPast) = sortAndDay
         LessonFilterState(
             searchQuery = searchQuery,
             selectedCourseId = selectedCourseId,
             dateFilter = dateFilter,
             sortOption = sortOption,
+            selectedDayOfWeek = selectedDayOfWeek,
             showPast = showPast
         )
     }
@@ -93,13 +106,29 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             availableCourses.firstOrNull { it.courseId == courseId }?.courseName
         }
 
-        val filteredLessons = lessons
+        val baseFilteredLessons = lessons
             .filter { matchesSearch(it, filters.searchQuery) }
             .filter { effectiveSelectedCourseId == null || it.lesson.courseId == effectiveSelectedCourseId }
             .filter { matchesDateFilter(it, filters.dateFilter, nowMillis) }
 
-        val lessonItems = filteredLessons.map { it.toLessonListItemUi(nowMillis) }
-        val (pastThisWeek, upcoming) = lessonItems.partition { it.isPastThisWeek }
+        val lessonItemsBeforeDayFilter = baseFilteredLessons.map { it.toLessonListItemUi(nowMillis) }
+        val (pastThisWeekBeforeDay, upcomingBeforeDay) = lessonItemsBeforeDayFilter.partition {
+            it.isPastThisWeek
+        }
+
+        val dayFilteredUpcoming = filters.selectedDayOfWeek?.let { dayOfWeek ->
+            upcomingBeforeDay.filter { it.dayOfWeek == dayOfWeek }
+        } ?: upcomingBeforeDay
+
+        val dayFilteredPast = filters.selectedDayOfWeek?.let { dayOfWeek ->
+            pastThisWeekBeforeDay.filter { it.dayOfWeek == dayOfWeek }
+        } ?: pastThisWeekBeforeDay
+
+        val agendaLessons = lessons
+            .filter { matchesSearch(it, filters.searchQuery) }
+            .filter { effectiveSelectedCourseId == null || it.lesson.courseId == effectiveSelectedCourseId }
+            .map { it.toLessonListItemUi(nowMillis) }
+            .filter { !it.isPastThisWeek }
 
         LessonsUiState(
             isLoading = isLoading,
@@ -109,13 +138,25 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
             selectedCourseName = selectedCourseName,
             selectedDateFilter = filters.dateFilter,
             selectedSortOption = filters.sortOption,
+            selectedDayOfWeek = filters.selectedDayOfWeek,
             availableCourses = availableCourses,
-            upcomingLessons = sortLessons(upcoming, filters.sortOption),
-            pastThisWeekLessons = sortPastLessons(pastThisWeek),
+            upcomingLessons = sortLessons(dayFilteredUpcoming, filters.sortOption),
+            pastThisWeekLessons = sortPastLessons(dayFilteredPast),
             showPastThisWeek = filters.showPast,
             hasAnyLessons = lessons.isNotEmpty(),
             isRefreshing = refreshState.isRefreshing,
-            refreshMessage = refreshState.refreshMessage
+            refreshMessage = refreshState.refreshMessage,
+            todayLessonCount = countLessonsForDateFilter(agendaLessons, LessonDateFilter.TODAY, nowMillis),
+            tomorrowLessonCount = countLessonsForDateFilter(
+                agendaLessons,
+                LessonDateFilter.TOMORROW,
+                nowMillis
+            ),
+            reminderLessonCount = agendaLessons.count { it.reminderEnabled },
+            lessonCountByDayOfWeek = upcomingBeforeDay
+                .groupingBy { it.dayOfWeek }
+                .eachCount(),
+            filteredResultCount = dayFilteredUpcoming.size + dayFilteredPast.size
         )
     }.stateIn(
         scope = viewModelScope,
@@ -151,11 +192,16 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
         _selectedSortOption.value = option
     }
 
+    fun onSelectedDayOfWeekChange(dayOfWeek: Int?) {
+        _selectedDayOfWeek.value = dayOfWeek
+    }
+
     fun clearFilters() {
         _searchQuery.value = ""
         _selectedCourseId.value = null
         _selectedDateFilter.value = LessonDateFilter.ALL
         _selectedSortOption.value = LessonSortOption.NEXT_UPCOMING
+        _selectedDayOfWeek.value = null
     }
 
     fun togglePastThisWeekVisibility() {
@@ -215,7 +261,7 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
                     force = true
                 ).message
             } catch (exception: Exception) {
-                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova piu tardi."
+                _refreshMessage.value = "Aggiornamento UniBo non riuscito. Riprova più tardi."
             } finally {
                 _isRefreshing.value = false
             }
@@ -288,6 +334,28 @@ class LessonsViewModel(application: Application) : AndroidViewModel(application)
         return lessons.sortedByDescending { it.nextOccurrenceMillis }
     }
 
+    private fun countLessonsForDateFilter(
+        lessons: List<LessonListItemUi>,
+        filter: LessonDateFilter,
+        nowMillis: Long
+    ): Int {
+        val zoneId = ZoneId.systemDefault()
+        val today = Instant.ofEpochMilli(nowMillis)
+            .atZone(zoneId)
+            .toLocalDate()
+
+        return lessons.count { lesson ->
+            val lessonDate = Instant.ofEpochMilli(lesson.nextOccurrenceMillis)
+                .atZone(zoneId)
+                .toLocalDate()
+            when (filter) {
+                LessonDateFilter.TODAY -> lessonDate == today
+                LessonDateFilter.TOMORROW -> lessonDate == today.plusDays(1)
+                else -> false
+            }
+        }
+    }
+
     private fun LessonWithCourse.toLessonListItemUi(nowMillis: Long): LessonListItemUi {
         val occurrenceMillis = lessonStartMillis(
             dateMillis = lesson.dateMillis,
@@ -354,6 +422,7 @@ private data class LessonFilterState(
     val selectedCourseId: Int?,
     val dateFilter: LessonDateFilter,
     val sortOption: LessonSortOption,
+    val selectedDayOfWeek: Int?,
     val showPast: Boolean
 )
 

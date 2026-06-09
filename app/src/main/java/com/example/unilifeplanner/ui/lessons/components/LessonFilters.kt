@@ -11,16 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +38,7 @@ fun LessonFiltersSection(
     onDateFilterChange: (LessonDateFilter) -> Unit,
     onCourseFilterChange: (Int?) -> Unit,
     onSortOptionChange: (LessonSortOption) -> Unit,
+    onSelectedDayOfWeekChange: (Int?) -> Unit,
     onClearFilters: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -48,56 +46,34 @@ fun LessonFiltersSection(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        OutlinedTextField(
-            value = uiState.searchQuery,
-            onValueChange = onSearchQueryChange,
-            label = { Text(text = "Cerca") },
-            placeholder = { Text(text = "Cerca corso, aula, edificio o note") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = null
-                )
-            },
-            trailingIcon = {
-                if (uiState.searchQuery.isNotBlank()) {
-                    IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Cancella ricerca"
-                        )
-                    }
-                }
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+        LessonSearchBar(
+            query = uiState.searchQuery,
+            onQueryChange = onSearchQueryChange
+        )
+
+        LessonsWeekCalendar(
+            lessonCountByDay = uiState.lessonCountByDayOfWeek,
+            selectedDayOfWeek = uiState.selectedDayOfWeek,
+            onDaySelected = onSelectedDayOfWeekChange
         )
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.horizontalScroll(rememberScrollState())
         ) {
-            LessonDateFilter.entries.forEach { filter ->
+            listOf(
+                LessonDateFilter.ALL,
+                LessonDateFilter.TODAY,
+                LessonDateFilter.TOMORROW,
+                LessonDateFilter.THIS_WEEK,
+                LessonDateFilter.REMINDER_ENABLED
+            ).forEach { filter ->
                 FilterChip(
                     selected = uiState.selectedDateFilter == filter,
                     onClick = { onDateFilterChange(filter) },
                     label = { Text(text = dateFilterLabel(filter)) }
                 )
             }
-        }
-
-        if (uiState.selectedCourseId != null && uiState.selectedCourseName != null) {
-            FilterChip(
-                selected = true,
-                onClick = { onCourseFilterChange(null) },
-                label = { Text(text = "Corso: ${uiState.selectedCourseName}") },
-                trailingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Rimuovi filtro corso"
-                    )
-                }
-            )
         }
 
         Row(
@@ -108,14 +84,23 @@ fun LessonFiltersSection(
             CourseDropdown(
                 courses = uiState.availableCourses,
                 selectedCourseName = uiState.selectedCourseName,
-                onCourseSelected = onCourseFilterChange
+                onCourseSelected = onCourseFilterChange,
+                modifier = Modifier.weight(1f)
             )
             SortDropdown(
                 selectedOption = uiState.selectedSortOption,
                 onSortOptionChange = onSortOptionChange
             )
-            OutlinedButton(onClick = onClearFilters) {
-                Text(text = "Cancella filtri")
+        }
+
+        if (hasActiveLessonFilters(uiState)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onClearFilters) {
+                    Text(text = "Cancella filtri")
+                }
             }
         }
     }
@@ -125,13 +110,20 @@ fun LessonFiltersSection(
 private fun CourseDropdown(
     courses: List<LessonCourseFilterUi>,
     selectedCourseName: String?,
-    onCourseSelected: (Int?) -> Unit
+    onCourseSelected: (Int?) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
-        OutlinedButton(onClick = { expanded = true }) {
-            Text(text = selectedCourseName ?: "Tutti i corsi")
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = selectedCourseName ?: "Tutti i corsi",
+                maxLines = 1
+            )
         }
         DropdownMenu(
             expanded = expanded,
@@ -196,13 +188,13 @@ private fun dateFilterLabel(filter: LessonDateFilter): String {
         LessonDateFilter.TODAY -> "Oggi"
         LessonDateFilter.TOMORROW -> "Domani"
         LessonDateFilter.THIS_WEEK -> "Questa settimana"
-        LessonDateFilter.REMINDER_ENABLED -> "Solo promemoria"
+        LessonDateFilter.REMINDER_ENABLED -> "Promemoria"
     }
 }
 
 private fun sortLabel(option: LessonSortOption): String {
     return when (option) {
-        LessonSortOption.NEXT_UPCOMING -> "Piu vicine"
+        LessonSortOption.NEXT_UPCOMING -> "Più vicine"
         LessonSortOption.DAY_AND_TIME -> "Giorno e orario"
         LessonSortOption.COURSE_NAME_ASC -> "Corso A-Z"
     }
