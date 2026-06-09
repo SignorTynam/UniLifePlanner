@@ -179,12 +179,12 @@ private fun HeaderSection() {
             tint = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Importa corsi dall'Università di Bologna",
+            text = "Importa corsi, lezioni e appelli da UniBo",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Importa insegnamenti e lezioni pubbliche dell'Università di Bologna senza collegare l'account studente.",
+            text = "Importa insegnamenti, lezioni/laboratori e appelli d'esame pubblici senza collegare l'account studente.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -455,6 +455,7 @@ private fun PreviewSection(
         }
         Text(text = "${preview.teachings.size} insegnamenti trovati")
         Text(text = "${preview.lessons.size} lezioni trovate")
+        Text(text = "${preview.examAppeals.size} appelli d'esame trovati")
         Text(text = "${preview.warnings.size} avvisi")
     }
 
@@ -470,7 +471,10 @@ private fun PreviewSection(
     preview.teachings.forEach { teaching ->
         TeachingPreviewCard(
             teaching = teaching,
-            lessonsCount = preview.lessonsByTeachingExternalId[teaching.externalId].orEmpty().size
+            lessonsCount = preview.lessonsByTeachingExternalId[teaching.externalId].orEmpty().size,
+            examAppealsCount = preview.examAppealsByTeachingExternalId[teaching.externalId]
+                .orEmpty()
+                .size
         )
     }
     Button(
@@ -483,14 +487,15 @@ private fun PreviewSection(
             contentDescription = null
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "Importa nel planner")
+        Text(text = "Importa corsi, lezioni e appelli")
     }
 }
 
 @Composable
 private fun TeachingPreviewCard(
     teaching: PublicTeaching,
-    lessonsCount: Int
+    lessonsCount: Int,
+    examAppealsCount: Int
 ) {
     UniLifeCard {
         Text(
@@ -512,6 +517,13 @@ private fun TeachingPreviewCard(
                 "Lezioni trovate: $lessonsCount"
             } else {
                 "Lezioni non disponibili"
+            }
+        )
+        InfoPill(
+            text = if (examAppealsCount > 0) {
+                "Appelli trovati: $examAppealsCount"
+            } else {
+                "Appelli non disponibili"
             }
         )
     }
@@ -568,6 +580,8 @@ private fun ImportedSection(
         Text(text = "Insegnamenti aggiornati: ${result.updatedTeachings}")
         Text(text = "Lezioni importate: ${result.importedLessons}")
         Text(text = "Lezioni aggiornate: ${result.updatedLessons}")
+        Text(text = "Appelli importati: ${result.importedExamAppeals}")
+        Text(text = "Appelli aggiornati: ${result.updatedExamAppeals}")
         Button(
             onClick = onGoToCoursesClick,
             modifier = Modifier.fillMaxWidth()

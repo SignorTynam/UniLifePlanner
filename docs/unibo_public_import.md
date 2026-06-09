@@ -2,7 +2,7 @@
 
 ## Scopo
 
-La funzione "Importa da UniBo" consente di cercare un corso di laurea dell'Universita di Bologna e importare nel planner gli insegnamenti pubblici del piano didattico. Quando gli orari sono pubblici e riconoscibili, importa anche le lezioni ricorrenti con aula e edificio.
+La funzione "Importa da UniBo" consente di cercare un corso di laurea dell'Universita di Bologna e importare nel planner gli insegnamenti pubblici del piano didattico. Quando gli orari sono pubblici e riconoscibili, importa anche le lezioni ricorrenti con aula e edificio. Importa inoltre gli appelli d'esame pubblici visibili nella pagina pubblica del corso di laurea.
 
 Questa funzione usa solo dati pubblici accessibili senza autenticazione. Non importa dati personali dello studente come libretto, prenotazioni esami o piano personale individuale.
 
@@ -17,17 +17,20 @@ L'import pubblico non richiede login UniBo, username, password, token o OAuth. N
 - Docenti, se presenti nella ricerca pubblica degli insegnamenti.
 - Link ufficiale UniBo dell'insegnamento, se disponibile.
 - Lezioni/orari/aula/edificio, solo quando la pagina pubblica espone righe con giorno e orario chiari.
+- Appelli d'esame pubblici del corso di laurea selezionato.
+- Data, ora, tipo prova e luogo dell'appello, quando presenti pubblicamente.
+- Note e lista iscrizioni, solo se esposte nella pagina pubblica.
 
 ## Limiti
 
-- Gli appelli d'esame personali non vengono importati.
+- Vengono importati solo gli appelli pubblici visibili nella pagina pubblica del corso di laurea. Non vengono importati iscrizioni personali, prenotazioni, esiti o dati dell'area riservata AlmaEsami.
 - Le informazioni dietro area riservata, captcha o login non vengono lette.
 - I piani didattici possono variare per curriculum o anno di immatricolazione; questa versione importa i piani pubblici trovati per il codice corso e l'anno accademico scelto.
 - Se UniBo cambia HTML o URL, il parser puo smettere di riconoscere alcuni dati.
 
 ## Duplicati
 
-I record importati usano `sourceProvider = "UNIBO_PUBLIC"` e un `externalId` stabile. L'import successivo aggiorna i record gia importati con lo stesso provider e ID, senza duplicare insegnamenti o lezioni. I dati creati manualmente dall'utente non hanno questi campi e non vengono sovrascritti.
+I record importati usano `sourceProvider = "UNIBO_PUBLIC"` per insegnamenti e lezioni, e `source = "UNIBO"` per gli appelli d'esame. Ogni record ha un `externalId` stabile. L'import successivo aggiorna i record gia importati con lo stesso provider/source e ID, senza duplicare insegnamenti, lezioni o appelli. I dati creati manualmente dall'utente non hanno questi campi e non vengono sovrascritti.
 
 ## Manutenzione parser
 
@@ -42,20 +45,23 @@ I selettori CSS sono centralizzati in `UniboPublicParser`. Le URL pubbliche sono
 
 1. Aprire l'app e fare login all'app.
 2. Aprire il drawer.
-3. Aprire "Importa UniBo" oppure "Universita" e poi "Importa da UniBo".
+3. Aprire "Universita" e poi "Importa da UniBo".
 4. Verificare il testo "Non richiede username, password o accesso all'area riservata."
 5. Selezionare anno accademico `2025/2026`, campus `Tutti` o `Cesena`, tipologia `Laurea`.
 6. Cercare `Ingegneria e Scienze Informatiche`.
 7. Selezionare il risultato corretto.
-8. Verificare anteprima insegnamenti, CFU, docenti e avvisi.
+8. Verificare anteprima insegnamenti, CFU, docenti, lezioni, appelli d'esame e avvisi.
 9. Importare nel planner.
 10. Aprire "Corsi" e verificare che gli insegnamenti siano presenti.
 11. Aprire un insegnamento e verificare note/link ufficiale.
 12. Se lezioni disponibili, aprire "Lezioni" e verificare orari e aule.
-13. Ripetere l'import e verificare che non crei duplicati.
-14. Disattivare internet e verificare un errore pulito.
-15. Verificare tema chiaro/scuro.
-16. Verificare `versionName = "1.1.2"`.
+13. Aprire "Esami" e verificare che gli appelli pubblici importati siano presenti.
+14. Ripetere l'import e verificare che non crei duplicati.
+15. Verificare che il pulsante "Importa UniBo" non sia piu presente nella schermata "Esami".
+16. Verificare che l'import avvenga solo da "Universita".
+17. Disattivare internet e verificare un errore pulito.
+18. Verificare tema chiaro/scuro.
+19. Verificare `versionName = "1.1.5"`.
 
 ## TODO futuri
 
@@ -66,6 +72,6 @@ I selettori CSS sono centralizzati in `UniboPublicParser`. Le URL pubbliche sono
 5. Gestione cambi aula/orario con confronto tra import vecchio e nuovo.
 6. Notifica se l'orario pubblico cambia.
 7. Selezione curriculum/indirizzo del corso di laurea.
-8. Import appelli pubblici se disponibili senza login.
+8. Gestione aggiornamenti o rimozioni degli appelli pubblici non piu presenti.
 9. Supporto multilingua italiano/inglese.
 10. Cache persistente con data ultimo aggiornamento.

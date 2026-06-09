@@ -76,7 +76,7 @@ fun UniversityScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Scegli corso di laurea, anno accademico e campus per importare insegnamenti e lezioni pubbliche nel planner.",
+                    text = "Scegli corso di laurea, anno accademico e campus per importare insegnamenti, lezioni/laboratori e appelli d'esame pubblici nel planner.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

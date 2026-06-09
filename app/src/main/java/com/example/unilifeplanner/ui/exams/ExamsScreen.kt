@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
@@ -93,8 +92,8 @@ fun ExamsScreen(
         viewModel.setInitialCourseFilter(initialCourseId)
     }
 
-    LaunchedEffect(uiState.errorMessage, uiState.importMessage) {
-        val message = uiState.errorMessage ?: uiState.importMessage
+    LaunchedEffect(uiState.errorMessage) {
+        val message = uiState.errorMessage
         if (message != null) {
             snackbarHostState.showSnackbar(message)
             viewModel.clearMessages()
@@ -142,7 +141,6 @@ fun ExamsScreen(
                 else -> ExamsContent(
                     uiState = uiState,
                     onAddExamClick = { onAddExamClick(uiState.selectedCourseId) },
-                    onImportFromUniboClick = viewModel::importExamsFromUnibo,
                     onCourseFilterChange = viewModel::onCourseFilterChange,
                     onClearCourseFilter = viewModel::clearCourseFilter,
                     onTogglePastExams = viewModel::togglePastExamsVisibility,
@@ -169,7 +167,6 @@ fun ExamsScreen(
 private fun ExamsContent(
     uiState: ExamsUiState,
     onAddExamClick: () -> Unit,
-    onImportFromUniboClick: () -> Unit,
     onCourseFilterChange: (Int?) -> Unit,
     onClearCourseFilter: () -> Unit,
     onTogglePastExams: () -> Unit,
@@ -191,7 +188,6 @@ private fun ExamsContent(
                 selectedCourseName = uiState.selectedCourseName,
                 hasCourses = uiState.availableCourses.isNotEmpty(),
                 onAddExamClick = onAddExamClick,
-                onImportFromUniboClick = onImportFromUniboClick,
                 onChooseCourseClick = { showCourseFilterDialog = true },
                 onClearCourseFilter = onClearCourseFilter
             )
@@ -201,7 +197,7 @@ private fun ExamsContent(
             item {
                 EmptyExamsState(
                     title = "Nessun appello disponibile",
-                    message = "Aggiungi manualmente un appello oppure importalo da UniBo quando disponibile."
+                    message = "Gli appelli UniBo vengono importati dalla voce Universita. Qui puoi aggiungerli manualmente e gestire i promemoria."
                 )
             }
             return@LazyColumn
@@ -306,7 +302,6 @@ private fun ExamsActionsCard(
     selectedCourseName: String?,
     hasCourses: Boolean,
     onAddExamClick: () -> Unit,
-    onImportFromUniboClick: () -> Unit,
     onChooseCourseClick: () -> Unit,
     onClearCourseFilter: () -> Unit
 ) {
@@ -332,19 +327,11 @@ private fun ExamsActionsCard(
                 Button(
                     onClick = onAddExamClick,
                     enabled = hasCourses,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(imageVector = Icons.Filled.Event, contentDescription = null)
                     Spacer(modifier = Modifier.padding(horizontal = 4.dp))
                     Text(text = "Aggiungi")
-                }
-                OutlinedButton(
-                    onClick = onImportFromUniboClick,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Filled.CloudDownload, contentDescription = null)
-                    Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                    Text(text = "Importa UniBo")
                 }
             }
             Row(

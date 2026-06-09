@@ -1,6 +1,9 @@
 package com.example.unilifeplanner.university.publicimport.unibo
 
+import com.example.unilifeplanner.domain.exams.examDateToStartOfDayMillis
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
+import com.example.unilifeplanner.university.publicimport.PublicTeaching
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,9 +100,86 @@ class UniboPublicParserTest {
         assertTrue(teachings.isEmpty())
     }
 
+    @Test
+    fun parseExamAppealsFromDegreeProgramPage_readsPublicAppealFields() {
+        val appeals = parser.parseExamAppealsFromDegreeProgramPage(
+            html = fixture("unibo/exam_appeals.html"),
+            degreeProgram = degreeProgram(),
+            teachings = listOf(algorithmsTeaching())
+        )
+
+        val appeal = appeals.first()
+
+        assertEquals("11929", appeal.teachingCode)
+        assertEquals("11929", appeal.teachingExternalId)
+        assertEquals("ALGORITMI E STRUTTURE DATI", appeal.teachingName)
+        assertEquals(examDateToStartOfDayMillis(LocalDate.of(2026, 6, 25)), appeal.dateMillis)
+        assertEquals(9 * 60, appeal.timeMinutes)
+        assertEquals("Scritto", appeal.type)
+        assertEquals("Aula 2.1", appeal.location)
+        assertTrue(requireNotNull(appeal.notes).contains("Lista iscrizioni: aperta dal 10 giugno 2026 al 22 giugno 2026"))
+        assertTrue(appeal.notes.contains("Note: Portare documento."))
+    }
+
+    @Test
+    fun parseExamAppealsFromDegreeProgramPage_buildsDistinctExternalIdsForSameTeaching() {
+        val appeals = parser.parseExamAppealsFromDegreeProgramPage(
+            html = fixture("unibo/exam_appeals.html"),
+            degreeProgram = degreeProgram(),
+            teachings = listOf(algorithmsTeaching())
+        )
+
+        assertEquals(3, appeals.size)
+        assertEquals(3, appeals.map { it.externalId }.distinct().size)
+    }
+
+    @Test
+    fun parseExamAppealsFromDegreeProgramPage_linksSameCodeDifferentProfessorsToSameTeaching() {
+        val appeals = parser.parseExamAppealsFromDegreeProgramPage(
+            html = fixture("unibo/exam_appeals.html"),
+            degreeProgram = degreeProgram(),
+            teachings = listOf(algorithmsTeaching())
+        )
+
+        assertTrue(appeals.any { it.professor == "MANIEZZO VITTORIO" })
+        assertTrue(appeals.any { it.professor == "MARGARA LUCIANO" })
+        assertEquals(setOf("11929"), appeals.map { it.teachingExternalId }.toSet())
+    }
+
+    @Test
+    fun parseExamAppealsFromDegreeProgramPage_emptyPageDoesNotCrash() {
+        val appeals = parser.parseExamAppealsFromDegreeProgramPage(
+            html = fixture("unibo/incomplete.html"),
+            degreeProgram = degreeProgram(),
+            teachings = listOf(algorithmsTeaching())
+        )
+
+        assertTrue(appeals.isEmpty())
+    }
+
     private fun fixture(path: String): String {
         return requireNotNull(javaClass.classLoader?.getResource(path)) {
             "Missing fixture $path"
         }.readText()
     }
+
+    private fun degreeProgram() = PublicDegreeProgram(
+        externalId = "6673",
+        name = "Ingegneria e scienze informatiche",
+        campus = "Cesena",
+        degreeType = "Laurea",
+        academicYear = "2025/2026",
+        officialUrl = "https://corsi.unibo.it/laurea/IngegneriaScienzeInformatiche"
+    )
+
+    private fun algorithmsTeaching() = PublicTeaching(
+        externalId = "11929",
+        degreeProgramExternalId = "6673",
+        name = "ALGORITMI E STRUTTURE DATI",
+        code = "11929",
+        professor = null,
+        credits = 6,
+        academicYear = "2025/2026",
+        officialUrl = "https://www.unibo.it/it/studiare/insegnamenti"
+    )
 }

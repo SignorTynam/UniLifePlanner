@@ -2,6 +2,7 @@ package com.example.unilifeplanner.university.publicimport.unibo
 
 import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
+import com.example.unilifeplanner.university.publicimport.PublicExamAppeal
 import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
 import com.example.unilifeplanner.university.publicimport.PublicLesson
@@ -87,6 +88,7 @@ class UniboPublicImportRepository(
                 degreeProgram = degreeProgram,
                 teachings = emptyList(),
                 lessons = emptyList(),
+                examAppeals = emptyList(),
                 warnings = listOf("Pagina pubblica del corso di laurea non trovata."),
                 curriculum = curriculum
             )
@@ -152,10 +154,18 @@ class UniboPublicImportRepository(
             }
         }
 
+        val examAppeals = loadExamAppealsSafely(
+            siteUrl = siteUrl,
+            degreeProgram = baseDegreeProgram,
+            teachings = enrichedTeachings,
+            warnings = warnings
+        )
+
         val preview = PublicImportPreview(
             degreeProgram = baseDegreeProgram,
             teachings = enrichedTeachings,
             lessons = lessons.distinctBy { it.externalId },
+            examAppeals = examAppeals.distinctBy { it.externalId },
             warnings = warnings.distinct(),
             curriculum = curriculum
         )
@@ -210,6 +220,33 @@ class UniboPublicImportRepository(
         }
     }
 
+    private suspend fun loadExamAppealsSafely(
+        siteUrl: String,
+        degreeProgram: PublicDegreeProgram,
+        teachings: List<PublicTeaching>,
+        warnings: MutableList<String>
+    ): List<PublicExamAppeal> {
+        return try {
+            val html = client.getExamAppealsPage(siteUrl)
+            val appeals = parser.parseExamAppealsFromDegreeProgramPage(
+                html = html,
+                degreeProgram = degreeProgram,
+                teachings = teachings
+            )
+            val publicRowsCount = PUBLIC_EXAM_DATE_LABEL_REGEX.findAll(html).count()
+            if (publicRowsCount > appeals.size) {
+                warnings += "Alcuni appelli pubblici non sono stati importati perche non collegabili agli insegnamenti selezionati."
+            }
+            appeals
+        } catch (exception: UniboPublicImportException) {
+            warnings += "Appelli pubblici non disponibili per il corso selezionato."
+            emptyList()
+        } catch (exception: Exception) {
+            warnings += "Appelli pubblici non disponibili per il corso selezionato."
+            emptyList()
+        }
+    }
+
     private fun String?.toCampusParam(): String? {
         val normalized = normalizeText(this.orEmpty())
         return when (normalized) {
@@ -221,5 +258,9 @@ class UniboPublicImportRepository(
             "rimini", "campus di rimini" -> "rimini"
             else -> normalized
         }
+    }
+
+    private companion object {
+        val PUBLIC_EXAM_DATE_LABEL_REGEX = "Data\\s+e\\s+ora\\s*:".toRegex(RegexOption.IGNORE_CASE)
     }
 }

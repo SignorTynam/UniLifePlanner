@@ -1,9 +1,12 @@
 package com.example.unilifeplanner.university.publicimport.unibo
 
 import com.example.unilifeplanner.data.local.CourseEntity
+import com.example.unilifeplanner.data.local.ExamAppealEntity
+import com.example.unilifeplanner.data.local.ExamAppealSource
 import com.example.unilifeplanner.data.local.LessonEntity
 import com.example.unilifeplanner.domain.lessons.nextLessonDateMillis
 import com.example.unilifeplanner.domain.model.CourseStatus
+import com.example.unilifeplanner.university.publicimport.PublicExamAppeal
 import com.example.unilifeplanner.university.publicimport.PublicLesson
 import com.example.unilifeplanner.university.publicimport.PublicTeaching
 import com.example.unilifeplanner.university.unibo.publicdata.UniboPublicConfig
@@ -62,6 +65,27 @@ class UniboPublicMapper {
             externalId = lesson.externalId,
             sourceProvider = UniboPublicConfig.PROVIDER,
             officialUrl = lesson.officialUrl,
+            createdAt = nowMillis,
+            updatedAt = nowMillis
+        )
+    }
+
+    fun mapExamAppealToEntity(
+        examAppeal: PublicExamAppeal,
+        courseId: Int,
+        nowMillis: Long = System.currentTimeMillis()
+    ): ExamAppealEntity {
+        return ExamAppealEntity(
+            courseId = courseId,
+            dateMillis = examAppeal.dateMillis,
+            timeMinutes = examAppeal.timeMinutes,
+            location = examAppeal.location,
+            notes = examAppeal.notes,
+            type = examAppeal.type,
+            reminderEnabled = false,
+            source = ExamAppealSource.UNIBO.name,
+            externalId = examAppeal.externalId,
+            officialUrl = examAppeal.officialUrl,
             createdAt = nowMillis,
             updatedAt = nowMillis
         )

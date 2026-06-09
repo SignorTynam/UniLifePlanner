@@ -12,8 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.jsoup.Jsoup
 
 class UniboPublicClient(
     client: OkHttpClient? = null
@@ -58,6 +60,21 @@ class UniboPublicClient(
     }
 
     suspend fun getTeachingPage(url: String): String = fetch(url.toHttpUrl())
+
+    suspend fun getExamAppealsPage(degreeProgramSiteUrl: String): String {
+        val baseUrl = degreeProgramSiteUrl.toHttpUrl()
+        val hasAppealsPath = baseUrl.pathSegments
+            .lastOrNull { it.isNotBlank() }
+            ?.equals("appelli", ignoreCase = true) == true
+        val url = baseUrl.newBuilder()
+            .apply {
+                if (!hasAppealsPath) {
+                    addPathSegment("appelli")
+                }
+            }
+            .build()
+        return fetchPaginatedExamAppeals(url)
+    }
 
     suspend fun searchTeachingByCodePage(
         code: String,
@@ -104,6 +121,33 @@ class UniboPublicClient(
         } catch (exception: IOException) {
             throw UniboPublicImportException("Il sito UniBo non e raggiungibile", exception)
         }
+    }
+
+    private suspend fun fetchPaginatedExamAppeals(firstUrl: HttpUrl): String {
+        val visited = mutableSetOf<String>()
+        val pending = ArrayDeque<HttpUrl>().apply { add(firstUrl) }
+        val pages = mutableListOf<String>()
+
+        while (pending.isNotEmpty() && visited.size < MAX_EXAM_APPEAL_PAGES) {
+            val url = pending.removeFirst()
+            val normalizedUrl = url.toString()
+            if (!visited.add(normalizedUrl)) continue
+
+            val html = fetch(url)
+            pages += html
+
+            Jsoup.parse(html, normalizedUrl)
+                .select("nav.pagination a[href], .pagination a[href]")
+                .mapNotNull { link -> link.absUrl("href").toHttpUrlOrNull() }
+                .filter { nextUrl ->
+                    nextUrl.host == firstUrl.host &&
+                        nextUrl.encodedPath == firstUrl.encodedPath &&
+                        nextUrl.toString() !in visited
+                }
+                .forEach { nextUrl -> pending.add(nextUrl) }
+        }
+
+        return pages.joinToString(separator = "\n")
     }
 
     private fun degreeSearchUrls(
@@ -167,6 +211,8 @@ class UniboPublicClient(
     )
 
     companion object {
+        private const val MAX_EXAM_APPEAL_PAGES = 20
+
         private fun defaultClient(): OkHttpClient {
             val builder = OkHttpClient.Builder()
                 .connectTimeout(12, TimeUnit.SECONDS)

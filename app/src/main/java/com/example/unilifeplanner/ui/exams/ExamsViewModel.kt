@@ -32,7 +32,6 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
     private val _showPastExams = MutableStateFlow(false)
     private val _isLoading = MutableStateFlow(true)
     private val _errorMessage = MutableStateFlow<String?>(null)
-    private val _importMessage = MutableStateFlow<String?>(null)
 
     private var hasAppliedInitialCourse = false
 
@@ -40,15 +39,13 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         _selectedCourseId,
         _showPastExams,
         _isLoading,
-        _errorMessage,
-        _importMessage
-    ) { selectedCourseId, showPast, isLoading, errorMessage, importMessage ->
+        _errorMessage
+    ) { selectedCourseId, showPast, isLoading, errorMessage ->
         ExamControls(
             selectedCourseId = selectedCourseId,
             showPast = showPast,
             isLoading = isLoading,
-            errorMessage = errorMessage,
-            importMessage = importMessage
+            errorMessage = errorMessage
         )
     }
 
@@ -87,8 +84,7 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
             upcomingExams = upcoming,
             pastExams = past,
             showPastExams = controls.showPast,
-            hasAnyExams = exams.isNotEmpty(),
-            importMessage = controls.importMessage
+            hasAnyExams = exams.isNotEmpty()
         )
     }.stateIn(
         scope = viewModelScope,
@@ -177,17 +173,8 @@ class ExamsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun importExamsFromUnibo() {
-        viewModelScope.launch {
-            val result = examAppealRepository.importExamsFromUnibo()
-            _importMessage.value = result.exceptionOrNull()?.message
-                ?: "Importazione da UniBo non ancora disponibile"
-        }
-    }
-
     fun clearMessages() {
         _errorMessage.value = null
-        _importMessage.value = null
     }
 
     private fun ExamAppealWithCourse.toListItem(nowMillis: Long): ExamAppealListItemUi {
@@ -223,6 +210,5 @@ private data class ExamControls(
     val selectedCourseId: Int?,
     val showPast: Boolean,
     val isLoading: Boolean,
-    val errorMessage: String?,
-    val importMessage: String?
+    val errorMessage: String?
 )

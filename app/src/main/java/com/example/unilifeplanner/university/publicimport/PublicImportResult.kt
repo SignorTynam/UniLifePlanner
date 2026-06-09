@@ -5,5 +5,7 @@ data class PublicImportResult(
     val updatedTeachings: Int,
     val importedLessons: Int,
     val updatedLessons: Int,
+    val importedExamAppeals: Int = 0,
+    val updatedExamAppeals: Int = 0,
     val warnings: List<String> = emptyList()
 )

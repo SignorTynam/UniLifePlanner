@@ -1,7 +1,11 @@
 package com.example.unilifeplanner.university.publicimport.unibo
 
+import com.example.unilifeplanner.data.local.ExamAppealSource
+import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.data.repository.CourseRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
+import com.example.unilifeplanner.domain.exams.examStartMillis
+import com.example.unilifeplanner.notifications.ExamReminderScheduler
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
 import com.example.unilifeplanner.university.publicimport.PublicImportPreview
 import com.example.unilifeplanner.university.publicimport.PublicImportResult
@@ -12,6 +16,8 @@ class UniboPublicImporter(
     private val courseRepository: CourseRepository,
     private val lessonRepository: LessonRepository,
     private val lessonReminderScheduler: LessonReminderScheduler,
+    private val examAppealRepository: ExamAppealRepository,
+    private val examReminderScheduler: ExamReminderScheduler,
     private val mapper: UniboPublicMapper = UniboPublicMapper()
 ) {
     suspend fun importPreview(preview: PublicImportPreview): PublicImportResult {
@@ -19,6 +25,8 @@ class UniboPublicImporter(
         var updatedTeachings = 0
         var importedLessons = 0
         var updatedLessons = 0
+        var importedExamAppeals = 0
+        var updatedExamAppeals = 0
         val warnings = preview.warnings.toMutableList()
         val localCourseIds = mutableMapOf<String, Int>()
 
@@ -59,8 +67,28 @@ class UniboPublicImporter(
             scheduleLessonReminderIfEnabled(result.id)
         }
 
-        if (updatedTeachings > 0 || updatedLessons > 0) {
-            warnings += "Alcune lezioni precedentemente importate potrebbero non essere piu presenti sul sito."
+        preview.examAppeals.forEach { examAppeal ->
+            val courseId = localCourseIds[examAppeal.teachingExternalId]
+            if (courseId == null) {
+                warnings += "Un appello non e stato importato perche l'insegnamento non e stato trovato."
+                return@forEach
+            }
+
+            val entity = mapper.mapExamAppealToEntity(
+                examAppeal = examAppeal,
+                courseId = courseId
+            )
+            val result = examAppealRepository.upsertImportedExamAppeal(
+                source = ExamAppealSource.UNIBO.name,
+                externalId = examAppeal.externalId,
+                examAppeal = entity
+            )
+            if (result.inserted) importedExamAppeals++ else updatedExamAppeals++
+            scheduleExamReminderIfEnabled(result.id)
+        }
+
+        if (updatedTeachings > 0 || updatedLessons > 0 || updatedExamAppeals > 0) {
+            warnings += "Alcuni dati precedentemente importati potrebbero non essere piu presenti sul sito."
         }
 
         return PublicImportResult(
@@ -68,6 +96,8 @@ class UniboPublicImporter(
             updatedTeachings = updatedTeachings,
             importedLessons = importedLessons,
             updatedLessons = updatedLessons,
+            importedExamAppeals = importedExamAppeals,
+            updatedExamAppeals = updatedExamAppeals,
             warnings = warnings.distinct()
         )
     }
@@ -87,6 +117,27 @@ class UniboPublicImporter(
             dayOfWeek = lesson.dayOfWeek,
             startTimeMinutes = lesson.startTimeMinutes,
             classroom = lesson.classroom
+        )
+    }
+
+    private suspend fun scheduleExamReminderIfEnabled(examAppealId: Int) {
+        val exam = examAppealRepository.getExamAppealById(examAppealId).first() ?: return
+        val startMillis = examStartMillis(
+            dateMillis = exam.dateMillis,
+            timeMinutes = exam.timeMinutes
+        )
+        if (!exam.reminderEnabled || startMillis <= System.currentTimeMillis()) {
+            examReminderScheduler.cancelExamAppealReminders(examAppealId)
+            return
+        }
+        val course = courseRepository.getCourseById(exam.courseId).first() ?: return
+        examReminderScheduler.rescheduleExamAppealReminders(
+            examAppealId = exam.id,
+            courseId = course.id,
+            courseName = course.name,
+            examDateMillis = exam.dateMillis,
+            timeMinutes = exam.timeMinutes,
+            reminderDateTimeMillis = exam.reminderDateTimeMillis
         )
     }
 }

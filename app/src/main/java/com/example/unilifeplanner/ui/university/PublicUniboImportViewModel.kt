@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.unilifeplanner.data.local.AppDatabase
 import com.example.unilifeplanner.data.repository.CourseRepository
+import com.example.unilifeplanner.data.repository.ExamAppealRepository
 import com.example.unilifeplanner.data.repository.LessonRepository
+import com.example.unilifeplanner.notifications.ExamReminderScheduler
 import com.example.unilifeplanner.notifications.LessonReminderScheduler
 import com.example.unilifeplanner.university.publicimport.PublicCurriculum
 import com.example.unilifeplanner.university.publicimport.PublicDegreeProgram
@@ -27,7 +29,9 @@ class PublicUniboImportViewModel(
         importer = UniboPublicImporter(
             courseRepository = CourseRepository(database.courseDao()),
             lessonRepository = LessonRepository(database.lessonDao()),
-            lessonReminderScheduler = LessonReminderScheduler(application.applicationContext)
+            lessonReminderScheduler = LessonReminderScheduler(application.applicationContext),
+            examAppealRepository = ExamAppealRepository(database.examAppealDao()),
+            examReminderScheduler = ExamReminderScheduler(application.applicationContext)
         )
     )
 

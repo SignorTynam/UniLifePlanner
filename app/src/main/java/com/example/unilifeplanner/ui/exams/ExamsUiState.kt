@@ -9,8 +9,7 @@ data class ExamsUiState(
     val upcomingExams: List<ExamAppealListItemUi> = emptyList(),
     val pastExams: List<ExamAppealListItemUi> = emptyList(),
     val showPastExams: Boolean = false,
-    val hasAnyExams: Boolean = false,
-    val importMessage: String? = null
+    val hasAnyExams: Boolean = false
 )
 
 data class ExamCourseOptionUi(

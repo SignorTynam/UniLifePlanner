@@ -114,9 +114,4 @@ class ExamAppealRepository(
         }
     }
 
-    suspend fun importExamsFromUnibo(): Result<Unit> {
-        return Result.failure(
-            UnsupportedOperationException("Importazione appelli UniBo non ancora disponibile")
-        )
-    }
 }
