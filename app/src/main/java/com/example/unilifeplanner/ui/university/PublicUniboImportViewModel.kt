@@ -55,6 +55,7 @@ class PublicUniboImportViewModel(
 
     fun loadDegreePrograms() {
         val state = _uiState.value
+        if (state.isBusy) return
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -96,6 +97,7 @@ class PublicUniboImportViewModel(
     }
 
     fun selectDegreeProgram(degreeProgram: PublicDegreeProgram) {
+        if (_uiState.value.isBusy) return
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -142,6 +144,7 @@ class PublicUniboImportViewModel(
 
     fun selectCurriculum(curriculum: PublicCurriculum) {
         val degreeProgram = _uiState.value.selectedDegreeProgram ?: return
+        if (_uiState.value.isBusy) return
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -174,6 +177,7 @@ class PublicUniboImportViewModel(
     fun selectStudyYear(year: Int) {
         val state = _uiState.value
         val degreeProgram = state.selectedDegreeProgram ?: return
+        if (state.isBusy) return
         viewModelScope.launch {
             try {
                 loadPreviewFor(
@@ -194,7 +198,9 @@ class PublicUniboImportViewModel(
     }
 
     fun importPreview() {
-        val preview = _uiState.value.preview ?: return
+        val state = _uiState.value
+        if (state.isBusy) return
+        val preview = state.preview ?: return
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -236,8 +242,8 @@ class PublicUniboImportViewModel(
 
     private fun Exception.toUserMessage(): String {
         return when (this) {
-            is UniboPublicImportException -> message ?: "Import UniBo non riuscito"
-            else -> message ?: "Import UniBo non riuscito"
+            is UniboPublicImportException -> message ?: "Import UniBo non riuscito. Verifica i filtri e riprova."
+            else -> message ?: "Import UniBo non riuscito. Controlla la connessione e riprova."
         }
     }
 
