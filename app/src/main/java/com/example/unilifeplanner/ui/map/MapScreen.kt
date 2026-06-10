@@ -11,43 +11,45 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CenterFocusStrong
-import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.unilifeplanner.data.map.UniversityPlacesDataSource
 import com.example.unilifeplanner.domain.model.PlaceType
 import com.example.unilifeplanner.domain.model.UniversityPlace
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
+import com.example.unilifeplanner.ui.map.components.CesenaCampusLocation
+import com.example.unilifeplanner.ui.map.components.LocationPermissionBanner
+import com.example.unilifeplanner.ui.map.components.MapBottomPanel
+import com.example.unilifeplanner.ui.map.components.MapDiagnosticsBanner
+import com.example.unilifeplanner.ui.map.components.MapFallbackContent
+import com.example.unilifeplanner.ui.map.components.SelectedPlacePanel
+import com.example.unilifeplanner.ui.map.components.toLatLng
+import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -56,6 +58,7 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -97,11 +100,17 @@ fun MapScreen(
         },
         onRefreshLocationClick = viewModel::refreshUserLocation,
         onPlaceClick = viewModel::selectPlace,
+        onClearSelectedPlaceClick = viewModel::clearSelectedPlace,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onClearSearchClick = { viewModel.onSearchQueryChange("") },
+        onPlaceTypeSelected = viewModel::onPlaceTypeSelected,
+        onClearFiltersClick = viewModel::clearFilters,
+        onMapLoaded = viewModel::onMapLoaded,
         onOpenPlaceInMapsClick = { place ->
             val opened = openPlaceInMaps(context, place)
             if (!opened) {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Nessuna app disponibile per aprire la mappa")
+                    snackbarHostState.showSnackbar("Impossibile aprire Google Maps")
                 }
             }
         }
@@ -116,6 +125,12 @@ private fun MapScreenContent(
     onRequestPermissionClick: () -> Unit,
     onRefreshLocationClick: () -> Unit,
     onPlaceClick: (UniversityPlace) -> Unit,
+    onClearSelectedPlaceClick: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onClearSearchClick: () -> Unit,
+    onPlaceTypeSelected: (PlaceType?) -> Unit,
+    onClearFiltersClick: () -> Unit,
+    onMapLoaded: () -> Unit,
     onOpenPlaceInMapsClick: (UniversityPlace) -> Unit
 ) {
     Scaffold(
@@ -124,69 +139,48 @@ private fun MapScreenContent(
                 title = "Mappa",
                 onMenuClick = onMenuClick,
                 actions = {
-                    IconButton(
-                        onClick = onRefreshLocationClick,
-                        enabled = uiState.hasLocationPermission
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CenterFocusStrong,
-                            contentDescription = "Centra sulla mia posizione"
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(end = 16.dp)
+                                .size(22.dp),
+                            strokeWidth = 2.dp
                         )
+                    } else {
+                        IconButton(
+                            onClick = {
+                                if (uiState.hasLocationPermission) {
+                                    onRefreshLocationClick()
+                                } else {
+                                    onRequestPermissionClick()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CenterFocusStrong,
+                                contentDescription = "Centra sulla mia posizione"
+                            )
+                        }
                     }
                 }
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        if (!uiState.hasLocationPermission) {
-            LocationPermissionContent(
-                modifier = Modifier.padding(innerPadding),
-                onRequestPermissionClick = onRequestPermissionClick
-            )
-        } else {
-            UniversityMapContent(
-                modifier = Modifier.padding(innerPadding),
-                uiState = uiState,
-                onPlaceClick = onPlaceClick,
-                onRefreshLocationClick = onRefreshLocationClick,
-                onOpenPlaceInMapsClick = onOpenPlaceInMapsClick
-            )
-        }
-    }
-}
-
-@Composable
-private fun LocationPermissionContent(
-    modifier: Modifier = Modifier,
-    onRequestPermissionClick: () -> Unit
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Filled.LocationOff,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
+        UniversityMapContent(
+            modifier = Modifier.padding(innerPadding),
+            uiState = uiState,
+            onRequestPermissionClick = onRequestPermissionClick,
+            onRefreshLocationClick = onRefreshLocationClick,
+            onPlaceClick = onPlaceClick,
+            onClearSelectedPlaceClick = onClearSelectedPlaceClick,
+            onSearchQueryChange = onSearchQueryChange,
+            onClearSearchClick = onClearSearchClick,
+            onPlaceTypeSelected = onPlaceTypeSelected,
+            onClearFiltersClick = onClearFiltersClick,
+            onMapLoaded = onMapLoaded,
+            onOpenPlaceInMapsClick = onOpenPlaceInMapsClick
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Per mostrare la tua posizione, consenti l'accesso alla posizione.",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "I luoghi universitari restano salvati localmente. La posizione serve solo per orientarti sulla mappa.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Button(onClick = onRequestPermissionClick) {
-            Text(text = "Concedi permesso")
-        }
     }
 }
 
@@ -194,18 +188,94 @@ private fun LocationPermissionContent(
 private fun UniversityMapContent(
     modifier: Modifier = Modifier,
     uiState: MapUiState,
-    onPlaceClick: (UniversityPlace) -> Unit,
+    onRequestPermissionClick: () -> Unit,
     onRefreshLocationClick: () -> Unit,
+    onPlaceClick: (UniversityPlace) -> Unit,
+    onClearSelectedPlaceClick: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onClearSearchClick: () -> Unit,
+    onPlaceTypeSelected: (PlaceType?) -> Unit,
+    onClearFiltersClick: () -> Unit,
+    onMapLoaded: () -> Unit,
     onOpenPlaceInMapsClick: (UniversityPlace) -> Unit
 ) {
-    val defaultTarget = remember(uiState.places) {
-        uiState.places.firstOrNull()?.toLatLng() ?: DefaultCampusLocation
+    var showMapLoadWarning by remember(uiState.isMapsConfigured) { mutableStateOf(false) }
+    var showLocationBanner by remember(uiState.hasLocationPermission) {
+        mutableStateOf(!uiState.hasLocationPermission)
     }
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(
-            uiState.userLocation ?: defaultTarget,
-            16f
+
+    LaunchedEffect(uiState.isMapsConfigured, uiState.isMapLoaded) {
+        showMapLoadWarning = false
+        if (uiState.isMapsConfigured && !uiState.isMapLoaded) {
+            delay(5000)
+            if (!uiState.isMapLoaded) {
+                showMapLoadWarning = true
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        MapArea(
+            uiState = uiState,
+            showMapLoadWarning = showMapLoadWarning,
+            onMapLoaded = onMapLoaded,
+            onPlaceClick = onPlaceClick
         )
+
+        MapOverlay(
+            uiState = uiState,
+            showMapLoadWarning = showMapLoadWarning,
+            showLocationPermissionBanner = showLocationBanner && !uiState.hasLocationPermission,
+            onRequestPermissionClick = onRequestPermissionClick,
+            onContinueWithoutLocationClick = { showLocationBanner = false },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            uiState.selectedPlace?.let { place ->
+                SelectedPlacePanel(
+                    place = place,
+                    onOpenPlaceInMapsClick = { onOpenPlaceInMapsClick(place) },
+                    onCloseClick = onClearSelectedPlaceClick,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+
+            MapBottomPanel(
+                places = uiState.filteredPlaces,
+                selectedPlace = uiState.selectedPlace,
+                userLocation = uiState.userLocation,
+                searchQuery = uiState.searchQuery,
+                selectedPlaceType = uiState.selectedPlaceType,
+                onSearchQueryChange = onSearchQueryChange,
+                onClearSearchClick = onClearSearchClick,
+                onPlaceTypeSelected = onPlaceTypeSelected,
+                onClearFiltersClick = onClearFiltersClick,
+                onPlaceClick = onPlaceClick,
+                onOpenPlaceClick = onOpenPlaceInMapsClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun MapArea(
+    uiState: MapUiState,
+    showMapLoadWarning: Boolean,
+    onMapLoaded: () -> Unit,
+    onPlaceClick: (UniversityPlace) -> Unit
+) {
+    val defaultTarget = remember(uiState.places) {
+        uiState.places.firstOrNull()?.toLatLng() ?: CesenaCampusLocation
+    }
+    val initialTarget = uiState.userLocation ?: defaultTarget
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(initialTarget, 16f)
     }
 
     LaunchedEffect(uiState.userLocation) {
@@ -216,108 +286,91 @@ private fun UniversityMapContent(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState,
-            uiSettings = MapUiSettings(
-                zoomControlsEnabled = false,
-                myLocationButtonEnabled = false
-            )
-        ) {
-            uiState.userLocation?.let { location ->
-                Marker(
-                    state = MarkerState(position = location),
-                    title = "La tua posizione",
-                    snippet = "Posizione rilevata dal dispositivo"
-                )
-            }
-
-            uiState.places.forEach { place ->
-                Marker(
-                    state = MarkerState(position = place.toLatLng()),
-                    title = place.name,
-                    snippet = place.description,
-                    onClick = {
-                        onPlaceClick(place)
-                        true
-                    }
-                )
-            }
-        }
-
-        if (uiState.isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
+    LaunchedEffect(uiState.selectedPlace?.id) {
+        uiState.selectedPlace?.let { place ->
+            cameraPositionState.animate(
+                update = CameraUpdateFactory.newLatLngZoom(place.toLatLng(), 17f)
             )
         }
+    }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(PaddingValues(16.dp)),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            FilledTonalButton(
-                onClick = onRefreshLocationClick,
-                modifier = Modifier.fillMaxWidth()
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Local setup: add MAPS_API_KEY=your_google_maps_key to local.properties.
+        if (uiState.isMapsConfigured) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    myLocationButtonEnabled = false
+                ),
+                onMapLoaded = onMapLoaded
             ) {
-                Icon(
-                    imageVector = Icons.Filled.CenterFocusStrong,
-                    contentDescription = null
-                )
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Text(text = "Centra sulla mia posizione")
-            }
+                uiState.userLocation?.let { location ->
+                    Marker(
+                        state = MarkerState(position = location),
+                        title = "La tua posizione",
+                        snippet = "Posizione rilevata dal dispositivo"
+                    )
+                }
 
-            uiState.selectedPlace?.let { place ->
-                SelectedPlaceCard(
-                    place = place,
-                    onOpenPlaceInMapsClick = { onOpenPlaceInMapsClick(place) }
-                )
+                uiState.filteredPlaces.forEach { place ->
+                    Marker(
+                        state = MarkerState(position = place.toLatLng()),
+                        title = place.name,
+                        snippet = place.description,
+                        onClick = {
+                            onPlaceClick(place)
+                            true
+                        }
+                    )
+                }
             }
+        }
+
+        if (!uiState.isMapsConfigured || showMapLoadWarning) {
+            MapFallbackContent(
+                isMapsConfigured = uiState.isMapsConfigured,
+                modifier = Modifier.matchParentSize()
+            )
         }
     }
 }
 
 @Composable
-private fun SelectedPlaceCard(
-    place: UniversityPlace,
-    onOpenPlaceInMapsClick: () -> Unit
+private fun MapOverlay(
+    uiState: MapUiState,
+    showMapLoadWarning: Boolean,
+    showLocationPermissionBanner: Boolean,
+    onRequestPermissionClick: () -> Unit,
+    onContinueWithoutLocationClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = place.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(PaddingValues(horizontal = 16.dp, vertical = 12.dp)),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (!uiState.isMapsConfigured) {
+            MapDiagnosticsBanner(
+                title = "Google Maps non configurato",
+                message = "Aggiungi MAPS_API_KEY in local.properties per visualizzare la mappa.",
+                isError = true
             )
-            Text(
-                text = placeTypeLabel(place.type),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
+        } else if (showMapLoadWarning) {
+            MapDiagnosticsBanner(
+                title = "La mappa non e stata caricata",
+                message = "Verifica API key, Maps SDK for Android, billing e connessione.",
+                isError = true
             )
-            Text(
-                text = place.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        }
+
+        if (showLocationPermissionBanner) {
+            LocationPermissionBanner(
+                onRequestPermissionClick = onRequestPermissionClick,
+                onContinueWithoutLocationClick = onContinueWithoutLocationClick
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Button(onClick = onOpenPlaceInMapsClick) {
-                    Text(text = "Apri in Google Maps")
-                }
-            }
         }
     }
 }
@@ -327,13 +380,17 @@ fun openPlaceInMaps(
     place: UniversityPlace
 ): Boolean {
     val label = Uri.encode(place.name)
-    val uri = Uri.parse(
+    val geoUri = Uri.parse(
         "geo:${place.latitude},${place.longitude}?q=${place.latitude},${place.longitude}($label)"
     )
-    val mapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+    val webUri = Uri.parse(
+        "https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}"
+    )
+    val mapsIntent = Intent(Intent.ACTION_VIEW, geoUri).apply {
         setPackage("com.google.android.apps.maps")
     }
-    val fallbackIntent = Intent(Intent.ACTION_VIEW, uri)
+    val fallbackGeoIntent = Intent(Intent.ACTION_VIEW, geoUri)
+    val fallbackWebIntent = Intent(Intent.ACTION_VIEW, webUri)
 
     return try {
         when {
@@ -342,8 +399,13 @@ fun openPlaceInMaps(
                 true
             }
 
-            fallbackIntent.resolveActivity(context.packageManager) != null -> {
-                context.startActivity(fallbackIntent)
+            fallbackGeoIntent.resolveActivity(context.packageManager) != null -> {
+                context.startActivity(fallbackGeoIntent)
+                true
+            }
+
+            fallbackWebIntent.resolveActivity(context.packageManager) != null -> {
+                context.startActivity(fallbackWebIntent)
                 true
             }
 
@@ -354,20 +416,87 @@ fun openPlaceInMaps(
     }
 }
 
-private fun UniversityPlace.toLatLng(): LatLng {
-    return LatLng(latitude, longitude)
-}
-
-private fun placeTypeLabel(type: PlaceType): String {
-    return when (type) {
-        PlaceType.LIBRARY -> "Biblioteca"
-        PlaceType.CANTEEN -> "Mensa"
-        PlaceType.STUDY_ROOM -> "Aula studio"
-        PlaceType.SECRETARIAT -> "Segreteria"
-        PlaceType.LAB -> "Laboratorio"
-        PlaceType.BUS_STOP -> "Fermata bus"
-        PlaceType.OTHER -> "Altro"
+@Preview(name = "Map screen - API key missing", showBackground = true, heightDp = 820)
+@Composable
+private fun PreviewMapScreenMissingKey() {
+    UniLifePlannerTheme {
+        MapScreenContent(
+            uiState = previewMapState(isMapsConfigured = false),
+            snackbarHostState = remember { SnackbarHostState() },
+            onMenuClick = {},
+            onRequestPermissionClick = {},
+            onRefreshLocationClick = {},
+            onPlaceClick = {},
+            onClearSelectedPlaceClick = {},
+            onSearchQueryChange = {},
+            onClearSearchClick = {},
+            onPlaceTypeSelected = {},
+            onClearFiltersClick = {},
+            onMapLoaded = {},
+            onOpenPlaceInMapsClick = {}
+        )
     }
 }
 
-private val DefaultCampusLocation = LatLng(45.47812, 9.22786)
+@Preview(name = "Map screen - permission missing", showBackground = true, heightDp = 820)
+@Composable
+private fun PreviewMapScreenPermissionMissing() {
+    UniLifePlannerTheme {
+        MapScreenContent(
+            uiState = previewMapState(hasLocationPermission = false),
+            snackbarHostState = remember { SnackbarHostState() },
+            onMenuClick = {},
+            onRequestPermissionClick = {},
+            onRefreshLocationClick = {},
+            onPlaceClick = {},
+            onClearSelectedPlaceClick = {},
+            onSearchQueryChange = {},
+            onClearSearchClick = {},
+            onPlaceTypeSelected = {},
+            onClearFiltersClick = {},
+            onMapLoaded = {},
+            onOpenPlaceInMapsClick = {}
+        )
+    }
+}
+
+@Preview(name = "Map screen - selected place dark", showBackground = true, heightDp = 820, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewMapScreenSelectedDark() {
+    UniLifePlannerTheme {
+        MapScreenContent(
+            uiState = previewMapState(
+                selectedPlace = UniversityPlacesDataSource.places.first(),
+                isMapsConfigured = false
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            onMenuClick = {},
+            onRequestPermissionClick = {},
+            onRefreshLocationClick = {},
+            onPlaceClick = {},
+            onClearSelectedPlaceClick = {},
+            onSearchQueryChange = {},
+            onClearSearchClick = {},
+            onPlaceTypeSelected = {},
+            onClearFiltersClick = {},
+            onMapLoaded = {},
+            onOpenPlaceInMapsClick = {}
+        )
+    }
+}
+
+private fun previewMapState(
+    isMapsConfigured: Boolean = true,
+    hasLocationPermission: Boolean = true,
+    selectedPlace: UniversityPlace? = null
+): MapUiState {
+    val places = UniversityPlacesDataSource.places
+    return MapUiState(
+        places = places,
+        filteredPlaces = places,
+        userLocation = LatLng(44.1392, 12.2430),
+        selectedPlace = selectedPlace,
+        isMapsConfigured = isMapsConfigured,
+        hasLocationPermission = hasLocationPermission
+    )
+}

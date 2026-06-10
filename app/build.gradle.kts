@@ -18,6 +18,9 @@ val localProperties = Properties().apply {
 val mapsApiKey = localProperties.getProperty("MAPS_API_KEY")
     ?: providers.gradleProperty("MAPS_API_KEY").orNull
     ?: ""
+val escapedMapsApiKey = mapsApiKey
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
 
 android {
     namespace = "com.example.unilifeplanner"
@@ -31,11 +34,12 @@ android {
         applicationId = "com.example.unilifeplanner"
         minSdk = 35
         targetSdk = 36
-        versionCode = 28
-        versionName = "1.1.17"
+        versionCode = 29
+        versionName = "1.1.18"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$escapedMapsApiKey\"")
     }
 
     buildTypes {
