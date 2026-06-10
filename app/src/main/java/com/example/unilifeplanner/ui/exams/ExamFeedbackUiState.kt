@@ -12,6 +12,7 @@ data class ExamFeedbackUiState(
     val location: String? = null,
     val selectedResult: ExamFeedbackResult = ExamFeedbackResult.PASSED,
     val grade: String = "",
+    val gradeError: String? = null,
     val notes: String = "",
     val markCourseCompleted: Boolean = true,
     val errorMessage: String? = null,

@@ -70,6 +70,7 @@ class ExamFeedbackViewModel(application: Application) : AndroidViewModel(applica
             it.copy(
                 selectedResult = result,
                 grade = if (result == ExamFeedbackResult.PASSED) it.grade else "",
+                gradeError = null,
                 markCourseCompleted = result == ExamFeedbackResult.PASSED && it.markCourseCompleted,
                 errorMessage = null
             )
@@ -77,7 +78,14 @@ class ExamFeedbackViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun updateGrade(value: String) {
-        _uiState.update { it.copy(grade = value, errorMessage = null) }
+        val limitedValue = value.take(12)
+        _uiState.update {
+            it.copy(
+                grade = limitedValue,
+                gradeError = validateExamGrade(limitedValue),
+                errorMessage = null
+            )
+        }
     }
 
     fun updateNotes(value: String) {
@@ -90,13 +98,41 @@ class ExamFeedbackViewModel(application: Application) : AndroidViewModel(applica
 
     fun saveFeedback() {
         val state = _uiState.value
+        if (state.isSaving) return
+        val normalizedGrade = if (state.selectedResult == ExamFeedbackResult.PASSED) {
+            normalizeExamGrade(state.grade)
+        } else {
+            ""
+        }
+        val gradeError = if (state.selectedResult == ExamFeedbackResult.PASSED) {
+            validateExamGrade(normalizedGrade)
+        } else {
+            null
+        }
+        if (gradeError != null) {
+            _uiState.update {
+                it.copy(
+                    grade = normalizedGrade,
+                    gradeError = gradeError,
+                    errorMessage = "Controlla il voto inserito"
+                )
+            }
+            return
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isSaving = true,
+                    grade = normalizedGrade,
+                    gradeError = null,
+                    errorMessage = null
+                )
+            }
             try {
                 examAppealRepository.saveExamFeedback(
                     examAppealId = state.examAppealId,
                     result = state.selectedResult,
-                    grade = state.grade,
+                    grade = normalizedGrade,
                     notes = state.notes
                 )
                 var completionMessage: String? = null
@@ -126,7 +162,7 @@ class ExamFeedbackViewModel(application: Application) : AndroidViewModel(applica
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = exception.message ?: "Salvataggio esito non riuscito"
+                        errorMessage = exception.message ?: "Non sono riuscito a salvare l’esito. Riprova."
                     )
                 }
             }
@@ -134,10 +170,31 @@ class ExamFeedbackViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun dismissFeedback() {
+        if (_uiState.value.isSaving) return
         val examAppealId = _uiState.value.examAppealId
         viewModelScope.launch {
             examAppealRepository.dismissExamFeedback(examAppealId)
             _uiState.update { it.copy(saveSuccess = true) }
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    private fun normalizeExamGrade(value: String): String {
+        return value.trim().uppercase()
+    }
+
+    private fun validateExamGrade(value: String): String? {
+        val normalized = normalizeExamGrade(value)
+        if (normalized.isBlank()) return null
+        if (normalized == "30L" || normalized == "30 E LODE") return null
+        val numericGrade = normalized.toIntOrNull()
+        return when {
+            numericGrade == null -> "Inserisci un voto tra 18 e 30, oppure 30L."
+            numericGrade !in 18..30 -> "Il voto deve essere compreso tra 18 e 30."
+            else -> null
         }
     }
 }

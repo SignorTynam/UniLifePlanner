@@ -1,37 +1,36 @@
 package com.example.unilifeplanner.ui.exams
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.unilifeplanner.domain.exams.ExamFeedbackResult
-import com.example.unilifeplanner.ui.components.UniLifeScreenContainer
 import com.example.unilifeplanner.ui.components.UniLifeTopBar
+import com.example.unilifeplanner.ui.exams.components.ExamCompletionSection
+import com.example.unilifeplanner.ui.exams.components.ExamFeedbackActions
+import com.example.unilifeplanner.ui.exams.components.ExamFeedbackDismissDialog
+import com.example.unilifeplanner.ui.exams.components.ExamFeedbackErrorState
+import com.example.unilifeplanner.ui.exams.components.ExamFeedbackHero
+import com.example.unilifeplanner.ui.exams.components.ExamFeedbackLoadingState
+import com.example.unilifeplanner.ui.exams.components.ExamGradeSection
+import com.example.unilifeplanner.ui.exams.components.ExamNotesSection
+import com.example.unilifeplanner.ui.exams.components.ExamResultSelector
+import com.example.unilifeplanner.ui.theme.UniLifePlannerTheme
 
 @Composable
 fun ExamFeedbackScreen(
@@ -41,56 +40,49 @@ fun ExamFeedbackScreen(
     viewModel: ExamFeedbackViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(examAppealId) {
         viewModel.load(examAppealId)
     }
+
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
             onSaved(uiState.courseId, uiState.completionMessage)
         }
     }
 
-    Scaffold(
-        topBar = {
-            UniLifeTopBar(
-                title = "Esito esame",
-                onBackClick = onBackClick
-            )
-        }
-    ) { innerPadding ->
-        UniLifeScreenContainer(
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                top = innerPadding.calculateTopPadding() + 20.dp,
-                end = 20.dp,
-                bottom = 20.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            when {
-                uiState.isLoading -> CircularProgressIndicator()
-                uiState.errorMessage != null -> Text(
-                    text = uiState.errorMessage.orEmpty(),
-                    color = MaterialTheme.colorScheme.error
-                )
-                else -> FeedbackForm(
-                    uiState = uiState,
-                    onResultSelected = viewModel::selectResult,
-                    onGradeChange = viewModel::updateGrade,
-                    onNotesChange = viewModel::updateNotes,
-                    onMarkCompletedChange = viewModel::updateMarkCourseCompleted,
-                    onSaveClick = viewModel::saveFeedback,
-                    onDismissClick = viewModel::dismissFeedback
-                )
-            }
+    val hasBlockingError = !uiState.isLoading && uiState.courseId == 0 &&
+        uiState.errorMessage != null
+
+    LaunchedEffect(uiState.errorMessage, hasBlockingError) {
+        val message = uiState.errorMessage
+        if (message != null && !hasBlockingError) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearError()
         }
     }
+
+    ExamFeedbackContent(
+        uiState = uiState,
+        snackbarHostState = snackbarHostState,
+        hasBlockingError = hasBlockingError,
+        onBackClick = onBackClick,
+        onResultSelected = viewModel::selectResult,
+        onGradeChange = viewModel::updateGrade,
+        onNotesChange = viewModel::updateNotes,
+        onMarkCompletedChange = viewModel::updateMarkCourseCompleted,
+        onSaveClick = viewModel::saveFeedback,
+        onDismissClick = viewModel::dismissFeedback
+    )
 }
 
 @Composable
-private fun FeedbackForm(
+private fun ExamFeedbackContent(
     uiState: ExamFeedbackUiState,
+    snackbarHostState: SnackbarHostState,
+    hasBlockingError: Boolean,
+    onBackClick: () -> Unit,
     onResultSelected: (ExamFeedbackResult) -> Unit,
     onGradeChange: (String) -> Unit,
     onNotesChange: (String) -> Unit,
@@ -98,108 +90,183 @@ private fun FeedbackForm(
     onSaveClick: () -> Unit,
     onDismissClick: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = uiState.courseName,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
+    var showDismissDialog by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            UniLifeTopBar(
+                title = "Esito esame",
+                onBackClick = onBackClick
             )
-            Text(text = uiState.dateTimeLabel)
-            uiState.location?.let { Text(text = it) }
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        }
+    ) { innerPadding ->
+        when {
+            uiState.isLoading -> ExamFeedbackLoadingState(
+                modifier = Modifier.padding(innerPadding)
+            )
+
+            hasBlockingError -> ExamFeedbackErrorState(
+                title = "Appello non trovato",
+                message = "L’appello potrebbe essere stato eliminato.",
+                onBackClick = onBackClick,
+                modifier = Modifier.padding(innerPadding)
+            )
+
+            else -> ExamFeedbackForm(
+                uiState = uiState,
+                onResultSelected = onResultSelected,
+                onGradeChange = onGradeChange,
+                onNotesChange = onNotesChange,
+                onMarkCompletedChange = onMarkCompletedChange,
+                onSaveClick = onSaveClick,
+                onDismissClick = { showDismissDialog = true },
+                modifier = Modifier.padding(innerPadding)
+            )
         }
     }
 
-    Text(
-        text = "Com'e andato l'esame?",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-    )
-    Column(modifier = Modifier.selectableGroup()) {
-        ExamFeedbackResult.entries.forEach { result ->
-            ResultOption(
-                result = result,
-                selected = uiState.selectedResult == result,
-                onSelected = { onResultSelected(result) }
-            )
-        }
-    }
-
-    if (uiState.selectedResult == ExamFeedbackResult.PASSED) {
-        OutlinedTextField(
-            value = uiState.grade,
-            onValueChange = onGradeChange,
-            label = { Text(text = "Voto") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+    if (showDismissDialog) {
+        ExamFeedbackDismissDialog(
+            onDismissRequest = { showDismissDialog = false },
+            onConfirmClick = {
+                showDismissDialog = false
+                onDismissClick()
+            }
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = uiState.markCourseCompleted,
-                onCheckedChange = onMarkCompletedChange
-            )
-            Text(text = "Segna questo corso come completato")
-        }
-    }
-
-    OutlinedTextField(
-        value = uiState.notes,
-        onValueChange = onNotesChange,
-        label = { Text(text = "Note personali") },
-        modifier = Modifier.fillMaxWidth()
-    )
-    Button(
-        onClick = onSaveClick,
-        enabled = !uiState.isSaving,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(text = "Salva esito")
-    }
-    OutlinedButton(
-        onClick = onDismissClick,
-        enabled = !uiState.isSaving,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(text = "Non chiedermelo piu per questo appello")
     }
 }
 
 @Composable
-private fun ResultOption(
-    result: ExamFeedbackResult,
-    selected: Boolean,
-    onSelected: () -> Unit
+private fun ExamFeedbackForm(
+    uiState: ExamFeedbackUiState,
+    onResultSelected: (ExamFeedbackResult) -> Unit,
+    onGradeChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
+    onMarkCompletedChange: (Boolean) -> Unit,
+    onSaveClick: () -> Unit,
+    onDismissClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .selectable(
-                selected = selected,
-                onClick = onSelected,
-                role = Role.RadioButton
-            )
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val controlsEnabled = !uiState.isSaving
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = 20.dp,
+            end = 20.dp,
+            bottom = 32.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        RadioButton(
-            selected = selected,
-            onClick = null
-        )
-        Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-        Text(text = result.label())
+        item {
+            ExamFeedbackHero(uiState = uiState)
+        }
+        item {
+            ExamResultSelector(
+                selectedResult = uiState.selectedResult,
+                onResultSelected = onResultSelected,
+                enabled = controlsEnabled
+            )
+        }
+        if (uiState.selectedResult == ExamFeedbackResult.PASSED) {
+            item {
+                ExamGradeSection(
+                    grade = uiState.grade,
+                    gradeError = uiState.gradeError,
+                    enabled = controlsEnabled,
+                    onGradeChange = onGradeChange
+                )
+            }
+            item {
+                ExamCompletionSection(
+                    checked = uiState.markCourseCompleted,
+                    enabled = controlsEnabled,
+                    onCheckedChange = onMarkCompletedChange
+                )
+            }
+        }
+        item {
+            ExamNotesSection(
+                notes = uiState.notes,
+                enabled = controlsEnabled,
+                onNotesChange = onNotesChange
+            )
+        }
+        item {
+            ExamFeedbackActions(
+                isSaving = uiState.isSaving,
+                onSaveClick = onSaveClick,
+                onDismissClick = onDismissClick
+            )
+        }
     }
 }
 
-private fun ExamFeedbackResult.label(): String {
-    return when (this) {
-        ExamFeedbackResult.PASSED -> "Superato"
-        ExamFeedbackResult.FAILED -> "Non superato"
-        ExamFeedbackResult.WAITING_RESULT -> "In attesa del risultato"
-        ExamFeedbackResult.NOT_ATTENDED -> "Non ho partecipato"
+@Preview(name = "Feedback screen - passed", showBackground = true, heightDp = 980)
+@Composable
+private fun PreviewExamFeedbackScreenPassed() {
+    UniLifePlannerTheme {
+        ExamFeedbackContent(
+            uiState = previewFeedbackState(
+                selectedResult = ExamFeedbackResult.PASSED,
+                grade = "28"
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            hasBlockingError = false,
+            onBackClick = {},
+            onResultSelected = {},
+            onGradeChange = {},
+            onNotesChange = {},
+            onMarkCompletedChange = {},
+            onSaveClick = {},
+            onDismissClick = {}
+        )
     }
+}
+
+@Preview(name = "Feedback screen - waiting dark", showBackground = true, heightDp = 900, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewExamFeedbackScreenWaitingDark() {
+    UniLifePlannerTheme {
+        ExamFeedbackContent(
+            uiState = previewFeedbackState(
+                selectedResult = ExamFeedbackResult.WAITING_RESULT,
+                location = null
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            hasBlockingError = false,
+            onBackClick = {},
+            onResultSelected = {},
+            onGradeChange = {},
+            onNotesChange = {},
+            onMarkCompletedChange = {},
+            onSaveClick = {},
+            onDismissClick = {}
+        )
+    }
+}
+
+private fun previewFeedbackState(
+    selectedResult: ExamFeedbackResult,
+    grade: String = "",
+    location: String? = "Aula 3.2",
+    isSaving: Boolean = false
+): ExamFeedbackUiState {
+    return ExamFeedbackUiState(
+        isLoading = false,
+        isSaving = isSaving,
+        examAppealId = 12,
+        courseId = 4,
+        courseName = "Sistemi operativi e laboratorio",
+        dateTimeLabel = "18 giugno 2026, 09:30",
+        location = location,
+        selectedResult = selectedResult,
+        grade = grade,
+        notes = "Domande su processi e scheduling.",
+        markCourseCompleted = true
+    )
 }
